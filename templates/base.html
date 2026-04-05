@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Практики{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        (function() {
+            const theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><a href="/dashboard">📚 Практики</a></div>
+        <div class="navbar-menu">
+            {% if session.user_id %}
+                <a href="/dashboard">Дашборд</a>
+                <a href="/reports">Отчёты</a>
+                
+                {% if session.role != 'teacher' %}
+                    <a href="/upload">Загрузить</a>
+                {% endif %}
+                
+                <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌙</button>
+                <span class="user-info">👤 {{ session.full_name }}</span>
+                <a href="/logout" class="btn-logout">Выйти</a>
+            {% else %}
+                <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌙</button>
+                <a href="/login">Войти</a>
+                <a href="/register">Регистрация</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer"><p>&copy; 2025 Система учёта практик</p></footer>
+    {% block scripts %}{% endblock %}
+    
+    <script>
+        const themeToggle = document.getElementById('theme-toggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            });
+            
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        }
+    </script>
+</body>
+</html>

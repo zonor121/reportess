@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Отчёты{% endblock %}
+{% block content %}
+<div class="reports-container">
+    <div class="reports-header">
+        <h2>{% if is_teacher %}Все отчёты студентов{% else %}Мои отчёты{% endif %}</h2>
+        
+        <div class="header-controls">
+            <!-- Кнопки переключения вида -->
+            <div class="layout-toggle">
+                <button class="layout-btn" onclick="setLayout('layout-3')" title="Список">☰</button>
+                <button class="layout-btn" onclick="setLayout('layout-4')" title="Сетка (2 колонки)">⊞</button>
+                <button class="layout-btn" onclick="setLayout('layout-6')" title="Сетка (3 колонки)">⊞</button>
+            </div>
+
+            {% if not is_teacher %}
+                <a href="/upload" class="btn btn-primary">+ Загрузить</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="reports-loading" class="loading">Загрузка...</div>
+    <!-- По умолчанию класс layout-3 -->
+    <div id="reports-list" class="reports-list layout-3" style="display:none;"></div>
+
+    <!-- Модалка просмотра -->
+    <div id="report-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close" id="modal-close">&times;</span>
+            <h3 id="modal-title"></h3>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Модалка оценки -->
+    <div id="review-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close" id="review-modal-close">&times;</span>
+            <h3>Оценка отчёта</h3>
+            <form id="review-form">
+                <input type="hidden" id="review-report-id">
+                <div class="form-group">
+                    <label for="review-status">Статус</label>
+                    <select id="review-status">
+                        <option value="pending">На проверке</option>
+                        <option value="approved">Принят</option>
+                        <option value="rejected">Возвращён</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="review-grade">Оценка</label>
+                    <input type="text" id="review-grade" placeholder="5, отлично">
+                </div>
+                <div class="form-group">
+                    <label for="review-feedback">Комментарий</label>
+                    <textarea id="review-feedback" rows="4"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Сохранить</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Передаем роль в JS
+    var IS_TEACHER = {{ 'true' if is_teacher else 'false' }};
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/main.js"></script>
+<script src="/static/js/reports.js"></script>
+{% endblock %}

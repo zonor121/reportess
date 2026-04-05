@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Дашборд{% endblock %}
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>📊 {% if is_teacher %}Панель управления преподавателя{% else %}Моя статистика{% endif %}</h2>
+        <span class="date-display" id="current-date"></span>
+    </div>
+
+    <!-- Карточки статистики -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #eef2ff; color: #4361ee;">📄</div>
+            <div class="stat-info">
+                <h3>Всего отчётов</h3>
+                <p class="stat-number">{{ stats.total }}</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #fff3cd; color: #664d03;">⏳</div>
+            <div class="stat-info">
+                <h3>На проверке</h3>
+                <p class="stat-number">{{ stats.pending }}</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #d1e7dd; color: #0f5132;">✅</div>
+            <div class="stat-info">
+                <h3>Принято</h3>
+                <p class="stat-number">{{ stats.approved }}</p>
+            </div>
+        </div>
+
+        {% if is_teacher %}
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #f8d7da; color: #842029;">🎓</div>
+            <div class="stat-info">
+                <h3>Активных студентов</h3>
+                <p class="stat-number">{{ stats.students }}</p>
+            </div>
+        </div>
+        {% else %}
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #f8d7da; color: #842029;">❌</div>
+            <div class="stat-info">
+                <h3>На доработке</h3>
+                <p class="stat-number">{{ stats.rejected }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Фильтр по студентам (только для преподавателей) -->
+    {% if is_teacher %}
+    <div class="filter-section">
+        <label for="student-filter">👥 Фильтр по студенту:</label>
+        <select id="student-filter" onchange="filterByStudent(this.value)">
+            <option value="">Все студенты</option>
+            {% for student in students_list %}
+            <option value="{{ student.id }}" {% if selected_student_id == student.id %}selected{% endif %}>
+                {{ student.full_name }} ({{ student.email }})
+            </option>
+            {% endfor %}
+        </select>
+        {% if selected_student_id %}
+        <a href="/dashboard" class="btn btn-sm btn-secondary">Сбросить фильтр</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Таблица последних действий -->
+    <div class="recent-section">
+        <h3>📋 Последние действия</h3>
+        {% if stats.recent %}
+        <div class="recent-list">
+            {% for report in stats.recent %}
+            <div class="recent-item">
+                <div class="recent-info">
+                    <strong>{{ report.title }}</strong>
+                    {% if is_teacher %}
+                        <span class="recent-author">👤 {{ report.users.full_name }}</span>
+                    {% endif %}
+                    <span class="recent-date">📅 {{ report.uploaded_at[:10] }}</span>
+                </div>
+                <span class="status-badge {{ statusClass(report.status) }}">{{ formatStatus(report.status) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-text">Действий пока нет.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Отображаем текущую дату
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('current-date').textContent = new Date().toLocaleDateString('ru-RU', options);
+
+    // Фильтрация по студенту
+    function filterByStudent(studentId) {
+        if (studentId) {
+            window.location.href = '/dashboard?student_id=' + studentId;
+        } else {
+            window.location.href = '/dashboard';
+        }
+    }
+</script>
+{% endblock %}
