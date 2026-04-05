@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ---------- Инициализация ----------
+# ==========================================
+# ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ
+# ==========================================
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
 if not app.config["SECRET_KEY"]:
@@ -33,7 +35,6 @@ ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "odt", "txt", "zip", "rar"}
 
 # ==========================================
 # ГЛОБАЛЬНЫЕ ФУНКЦИИ ДЛЯ ШАБЛОНОВ
-# ВАЖНО: Используем template_global, чтобы вызывать как statusClass()
 # ==========================================
 @app.template_global('statusClass')
 def get_status_class(status):
@@ -79,6 +80,20 @@ def teacher_required(f):
             return redirect(url_for("index"))
         return f(*args, **kwargs)
     return decorated
+
+def create_notification(user_id, title, message, type="info", report_id=None, sender_id=None):
+    try:
+        supabase.table("notifications").insert({
+            "user_id": user_id,
+            "sender_id": sender_id,
+            "title": title,
+            "message": message,
+            "type": type,
+            "report_id": report_id,
+            "is_read": False
+        }).execute()
+    except Exception as e:
+        print(f"Ошибка создания уведомления: {e}")
 
 # ==========================================
 # DB ФУНКЦИИ
@@ -143,61 +158,6 @@ def index():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
-@app.route("/dashboard")
-@login_required
-def dashboard():
-    is_teacher = session.get("role") == "teacher"
-    stats = {}
-    
-    # Получаем список всех студентов (для фильтра)
-    students_list = []
-    if is_teacher:
-        students = supabase.table("users").select("id, full_name, email").eq("role", "student").execute()
-        students_list = students.data if students.data else []
-
-    # Получаем student_id из параметров запроса
-    selected_student_id = request.args.get("student_id")
-
-    if is_teacher:
-        # Базовый запрос
-        query = supabase.table("reports").select("*, users(full_name, email)")
-        
-        # Если выбран конкретный студент - фильтруем
-        if selected_student_id:
-            query = query.eq("student_id", selected_student_id)
-        
-        all_reports = query.order("uploaded_at", desc=True).execute().data or []
-        
-        pending_count = len([r for r in all_reports if r.get("status") == "pending"])
-        approved_count = len([r for r in all_reports if r.get("status") == "approved"])
-        rejected_count = len([r for r in all_reports if r.get("status") == "rejected"])
-        unique_students = len(set(r["student_id"] for r in all_reports))
-        recent_reports = all_reports[:5]
-
-        stats = {
-            "total": len(all_reports),
-            "pending": pending_count,
-            "approved": approved_count,
-            "rejected": rejected_count,
-            "students": unique_students,
-            "recent": recent_reports
-        }
-    else:
-        my_reports = supabase.table("reports").select("*").eq("student_id", session["user_id"]).order("uploaded_at", desc=True).execute().data or []
-        stats = {
-            "total": len(my_reports),
-            "pending": len([r for r in my_reports if r.get("status") == "pending"]),
-            "approved": len([r for r in my_reports if r.get("status") == "approved"]),
-            "rejected": len([r for r in my_reports if r.get("status") == "rejected"]),
-            "recent": my_reports[:5]
-        }
-
-    return render_template("dashboard.html", 
-                         is_teacher=is_teacher, 
-                         stats=stats, 
-                         students_list=students_list,
-                         selected_student_id=selected_student_id)
-
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -253,6 +213,54 @@ def logout():
     flash("Вы вышли из системы.", "info")
     return redirect(url_for("login"))
 
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    is_teacher = session.get("role") == "teacher"
+    stats = {}
+    students_list = []
+    selected_student_id = request.args.get("student_id")
+
+    if is_teacher:
+        students = supabase.table("users").select("id, full_name, email").eq("role", "student").execute()
+        students_list = students.data if students.data else []
+
+        query = supabase.table("reports").select("*, users(full_name, email)")
+        if selected_student_id:
+            query = query.eq("student_id", selected_student_id)
+        
+        all_reports = query.order("uploaded_at", desc=True).execute().data or []
+        
+        pending_count = len([r for r in all_reports if r.get("status") == "pending"])
+        approved_count = len([r for r in all_reports if r.get("status") == "approved"])
+        rejected_count = len([r for r in all_reports if r.get("status") == "rejected"])
+        unique_students = len(set(r["student_id"] for r in all_reports))
+        recent_reports = all_reports[:5]
+
+        stats = {
+            "total": len(all_reports),
+            "pending": pending_count,
+            "approved": approved_count,
+            "rejected": rejected_count,
+            "students": unique_students,
+            "recent": recent_reports
+        }
+    else:
+        my_reports = supabase.table("reports").select("*").eq("student_id", session["user_id"]).order("uploaded_at", desc=True).execute().data or []
+        stats = {
+            "total": len(my_reports),
+            "pending": len([r for r in my_reports if r.get("status") == "pending"]),
+            "approved": len([r for r in my_reports if r.get("status") == "approved"]),
+            "rejected": len([r for r in my_reports if r.get("status") == "rejected"]),
+            "recent": my_reports[:5]
+        }
+
+    return render_template("dashboard.html", 
+                         is_teacher=is_teacher, 
+                         stats=stats, 
+                         students_list=students_list,
+                         selected_student_id=selected_student_id)
+
 @app.route("/reports")
 @login_required
 def reports():
@@ -267,6 +275,45 @@ def upload_page():
         return redirect(url_for("dashboard"))
     return render_template("upload.html")
 
+# ==========================================
+# API УВЕДОМЛЕНИЙ
+# ==========================================
+@app.route("/api/notifications", methods=["GET"])
+@login_required
+def get_notifications():
+    result = supabase.table("notifications") \
+        .select("*") \
+        .eq("user_id", session["user_id"]) \
+        .order("created_at", desc=True) \
+        .limit(10) \
+        .execute()
+    return jsonify(result.data if result.data else [])
+
+@app.route("/api/notifications/unread-count", methods=["GET"])
+@login_required
+def get_unread_count():
+    result = supabase.table("notifications") \
+        .select("id", count="exact") \
+        .eq("user_id", session["user_id"]) \
+        .eq("is_read", False) \
+        .execute()
+    return jsonify({"count": result.count})
+
+@app.route("/api/notifications/<notification_id>/read", methods=["POST"])
+@login_required
+def mark_notification_read(notification_id):
+    supabase.table("notifications").update({"is_read": True}).eq("id", notification_id).execute()
+    return jsonify({"message": "OK"})
+
+@app.route("/api/notifications/read-all", methods=["POST"])
+@login_required
+def mark_all_read():
+    supabase.table("notifications").update({"is_read": True}).eq("user_id", session["user_id"]).execute()
+    return jsonify({"message": "OK"})
+
+# ==========================================
+# API ОТЧЁТОВ И ЗАГРУЗКИ
+# ==========================================
 @app.route("/api/reports", methods=["GET"])
 @login_required
 def api_reports():
@@ -330,6 +377,19 @@ def api_upload():
     )
 
     if report:
+        # === УВЕДОМЛЕНИЕ: Студент загрузил работу ===
+        teachers = supabase.table("users").select("id").eq("role", "teacher").execute()
+        if teachers.data:
+            for teacher in teachers.data:
+                create_notification(
+                    user_id=teacher["id"],
+                    title="Новая работа на проверку",
+                    message=f"Студент {session['full_name']} загрузил отчёт: {title}",
+                    type="upload",
+                    report_id=report["id"],
+                    sender_id=session["user_id"]
+                )
+        
         return jsonify({"message": "Отчёт загружен", "report_id": report["id"]}), 201
     else:
         try:
@@ -347,6 +407,17 @@ def api_review_report(report_id):
 
     result = update_report_status(report_id, status, grade, feedback)
     if result:
+        # === УВЕДОМЛЕНИЕ: Преподаватель оценил работу ===
+        report = get_report_by_id(report_id)
+        if report:
+            create_notification(
+                user_id=report["student_id"],
+                title="Оценка выставлена",
+                message=f"Ваш отчёт '{report['title']}' получил статус: {get_status_text(status)}",
+                type="review",
+                report_id=report_id,
+                sender_id=session["user_id"]
+            )
         return jsonify({"message": "Оценка сохранена"})
     return jsonify({"error": "Ошибка"}), 500
 

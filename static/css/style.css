@@ -238,6 +238,111 @@ a:hover { text-decoration: underline; }
 }
 .upload-header h2 { margin-bottom: 0; }
 
+/* ===== Уведомления ===== */
+.notif-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.notif-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #e63946;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    border-radius: 10px;
+    font-weight: bold;
+    border: 2px solid var(--navbar-bg); /* Или цвет фона навбара */
+}
+
+/* Тёмная тема для бейджа */
+[data-theme="dark"] .notif-badge {
+    border-color: #1e293b;
+}
+
+.notif-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 110%;
+    width: 320px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.notif-dropdown.show {
+    display: block;
+}
+
+.notif-header {
+    padding: 10px 15px;
+    font-weight: bold;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+#notif-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.notif-item {
+    padding: 12px 15px;
+    display: flex;
+    gap: 10px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.notif-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.notif-item.read {
+    opacity: 0.6;
+}
+
+.notif-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    width: 30px;
+    text-align: center;
+}
+
+.notif-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.notif-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notif-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
 /* Фильтр на дашборде */
 .filter-section {
     background: var(--bg-secondary);

@@ -24,6 +24,18 @@
                     <a href="/upload">Загрузить</a>
                 {% endif %}
                 
+                <!-- КОЛОКОЛЬЧИК УВЕДОМЛЕНИЙ -->
+                <div class="notif-wrapper">
+                    <button class="theme-toggle" id="notif-btn" title="Уведомления">
+                        🔔
+                        <span class="notif-badge" id="notif-count" style="display:none;">0</span>
+                    </button>
+                    <div class="notif-dropdown" id="notif-dropdown">
+                        <div class="notif-header">Уведомления</div>
+                        <div id="notif-list"></div>
+                    </div>
+                </div>
+
                 <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌙</button>
                 <span class="user-info">👤 {{ session.full_name }}</span>
                 <a href="/logout" class="btn-logout">Выйти</a>
@@ -46,6 +58,9 @@
 
     <footer class="footer"><p>&copy; 2025 Система учёта практик</p></footer>
     {% block scripts %}{% endblock %}
+    
+    <!-- Подключаем скрипт уведомлений -->
+    <script src="/static/js/notifications.js"></script>
     
     <script>
         const themeToggle = document.getElementById('theme-toggle');
