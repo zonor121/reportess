@@ -11,27 +11,32 @@ document.addEventListener("DOMContentLoaded", function () {
     applyLayout(savedLayout);
 
     loadReports();
+    
+    // === ПРОВЕРКА: есть ли в URL параметр open_report ===
+    const urlParams = new URLSearchParams(window.location.search);
+    const reportIdToOpen = urlParams.get('open_report');
+    
+    if (reportIdToOpen) {
+        setTimeout(function() {
+            viewReport(reportIdToOpen);
+            window.history.replaceState({}, document.title, '/reports');
+        }, 1000);
+    }
 
-    // Функция применения макета
     function applyLayout(layoutClass) {
-        // 1. Меняем классы контейнера
         reportsList.classList.remove('layout-3', 'layout-4', 'layout-6');
         reportsList.classList.add(layoutClass);
         
-        // 2. Обновляем активную кнопку
         document.querySelectorAll('.layout-btn').forEach(btn => {
             btn.classList.remove('active');
-            // Проверяем, какая кнопка соответствует этому макету
             if (btn.getAttribute('onclick').includes(layoutClass)) {
                 btn.classList.add('active');
             }
         });
 
-        // 3. ВАЖНО: Перерисовываем отчёты, чтобы показать/скрыть комментарии
         loadReports();
     }
 
-    // Глобальная функция для HTML кнопок
     window.setLayout = function(layoutClass) {
         applyLayout(layoutClass);
         localStorage.setItem('reportsLayout', layoutClass);
@@ -45,7 +50,6 @@ document.addEventListener("DOMContentLoaded", function () {
             .then(res => res.ok ? res.json() : Promise.reject("Ошибка сети"))
             .then(data => {
                 loading.style.display = "none";
-                // Если нет данных - показываем пустоту, иначе flex/grid
                 reportsList.style.display = (data.length > 0) ? "" : "none";
 
                 if (!data.length) {
@@ -86,8 +90,6 @@ document.addEventListener("DOMContentLoaded", function () {
             actionsHTML += `<button class="btn btn-secondary btn-sm" onclick="downloadReport('${report.id}')">Скачать</button>`;
         }
 
-        // === ЛОГИКА ДЛЯ КОММЕНТАРИЯ ===
-        // Показываем комментарий только в режиме Списка (layout-3)
         let feedbackHTML = '';
         if (report.feedback && reportsList.classList.contains('layout-3')) {
             feedbackHTML = `
@@ -96,7 +98,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 </div>
             `;
         }
-        // =============================
 
         card.innerHTML = `
             <div class="report-info">

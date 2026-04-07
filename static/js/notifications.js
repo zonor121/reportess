@@ -75,12 +75,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
                     // Клик по уведомлению помечает его как прочитанное и перенаправляет
                     div.addEventListener("click", function() {
-                        if (!notif.is_read) {
+                         if (!notif.is_read) {
                             markAsRead(notif.id);
                         }
+                            
+                        // Если есть report_id, перенаправляем на страницу отчётов с параметром
                         if (notif.report_id) {
-                            window.location.href = link;
-                        }
+                            // Открываем страницу отчётов и передаём ID для авто-открытия
+                            window.location.href = '/reports?open_report=' + notif.report_id;
+                         }
                     });
 
                     notifList.appendChild(div);
