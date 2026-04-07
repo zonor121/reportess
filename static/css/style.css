@@ -343,6 +343,12 @@ a:hover { text-decoration: underline; }
     color: var(--text-muted);
 }
 
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
 /* Фильтр на дашборде */
 .filter-section {
     background: var(--bg-secondary);

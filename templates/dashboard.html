@@ -3,9 +3,19 @@
 {% block content %}
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h2>📊 {% if is_teacher %}Панель управления преподавателя{% else %}Моя статистика{% endif %}</h2>
+        <div class="header-left">
+            <h2>📊 {% if is_teacher %}Панель управления преподавателя{% else %}Моя статистика{% endif %}</h2>
+            <!-- Кнопка экспорта (видна только преподавателю) -->
+            {% if is_teacher %}
+            <a href="/api/export-excel" class="btn btn-success btn-sm">
+                📥 Скачать отчёт в Excel
+            </a>
+            {% endif %}
+        </div>
         <span class="date-display" id="current-date"></span>
     </div>
+
+    <!-- ... остальной код дашборда ... -->
 
     <!-- Карточки статистики -->
     <div class="stats-grid">

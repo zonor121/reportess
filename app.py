@@ -2,6 +2,9 @@ import os
 import uuid
 import datetime
 import secrets
+import pandas as pd
+import io
+from flask import send_file
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -436,6 +439,68 @@ def api_report_file(report_id):
         "file_url": public_url,
         "file_name": report["file_name"],
     })
+
+# ... (остальной код app.py) ...
+
+@app.route("/api/export-excel")
+@teacher_required # Доступ только преподавателям
+def export_excel():
+    try:
+        # 1. Получаем все отчёты с данными студентов
+        # Используем inner join, чтобы не тащить пустые связи
+        result = supabase.table("reports") \
+            .select("*, users(full_name, email)") \
+            .order("uploaded_at", desc=True) \
+            .execute()
+        
+        data = result.data if result.data else []
+
+        # 2. Формируем плоский список данных для таблицы
+        excel_data = []
+        for report in data:
+            student_info = report.get("users", {})
+            excel_data.append({
+                "ФИО Студента": student_info.get("full_name", "Неизвестно"),
+                "Email": student_info.get("email", "-"),
+                "Название отчёта": report.get("title"),
+                "Тип практики": report.get("practice_type"),
+                "Период": f"{report.get('practice_start')} — {report.get('practice_end')}",
+                "Дата загрузки": str(report.get("uploaded_at", ""))[:10], # Берем только дату
+                "Статус": get_status_text(report.get("status")),
+                "Оценка": report.get("grade") or "—",
+                "Комментарий": report.get("feedback") or "—"
+            })
+
+        # 3. Создаём DataFrame (таблицу Pandas)
+        df = pd.DataFrame(excel_data)
+
+        # 4. Сохраняем в оперативную память (BytesIO), чтобы не создавать файлы на диске
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Отчёты")
+            
+            # Немного красоты: авто-ширина колонок
+            workbook = writer.book
+            worksheet = writer.sheets["Отчёты"]
+            for idx, col in enumerate(df.columns):
+                max_len = max(df[col].astype(str).map(len).max(), len(col))
+                # Формула для ширины (ограничиваем макс. шириной)
+                width = min(max_len + 2, 50)
+                worksheet.column_dimensions[chr(65 + idx)].width = width
+
+        output.seek(0)
+
+        # 5. Отдаём файл клиенту
+        return send_file(
+            output,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name="Otchety_Praktiki.xlsx"
+        )
+
+    except Exception as e:
+        print(f"Ошибка генерации Excel: {e}")
+        return jsonify({"error": "Не удалось создать файл"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
