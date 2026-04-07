@@ -2,6 +2,6 @@ flask
 supabase
 python-dotenv
 werkzeug
-pandes 
+pandas 
 openpyxl
 gunicorn
