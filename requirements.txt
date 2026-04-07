@@ -4,3 +4,4 @@ python-dotenv
 werkzeug
 pandes 
 openpyxl
+gunicorn
