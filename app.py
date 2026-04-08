@@ -540,6 +540,74 @@ def api_delete_report_template(template_id):
     supabase.table("report_templates").delete().eq("id", template_id).execute()
     return jsonify({"message": "OK"})
 
+@app.route("/api/reports/<report_id>", methods=["PUT"])
+@login_required
+def api_update_report(report_id):
+    # 1. Проверка прав
+    report = get_report_by_id(report_id)
+    if not report:
+        return jsonify({"error": "Отчёт не найден"}), 404
+    
+    # Только студент-владелец может редактировать
+    if report["student_id"] != session["user_id"]:
+        return jsonify({"error": "Доступ запрещён"}), 403
+    
+    # Только статус "pending" можно менять
+    if report["status"] != "pending":
+        return jsonify({"error": "Редактирование закрыто, отчёт уже проверен"}), 400
+
+    # 2. Получаем данные
+    title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
+    practice_type = request.form.get("practice_type", "").strip()
+    practice_start = request.form.get("practice_start", "").strip()
+    practice_end = request.form.get("practice_end", "").strip()
+
+    if not title or not practice_type:
+        return jsonify({"error": "Заполните обязательные поля"}), 400
+
+    update_data = {
+        "title": title,
+        "description": description,
+        "practice_type": practice_type,
+        "practice_start": practice_start,
+        "practice_end": practice_end,
+    }
+
+    # 3. Обработка файла (если загрузили новый)
+    if "file" in request.files:
+        file = request.files["file"]
+        if file and file.filename != "":
+            original_full_name = file.filename
+            ext = original_full_name.rsplit(".", 1)[1].lower()
+            
+            # Удаляем старый файл из хранилища
+            old_file_path = report["file_path"]
+            try:
+                supabase.storage.from_(SUPABASE_BUCKET).remove([old_file_path])
+            except Exception as e:
+                print(f"Ошибка удаления старого файла: {e}")
+
+            # Загружаем новый
+            safe_name = secure_filename(original_full_name.rsplit(".", 1)[0])
+            unique_filename = f"{uuid.uuid4().hex}.{ext}"
+            
+            try:
+                file_content = file.read()
+                supabase.storage.from_(SUPABASE_BUCKET).upload(unique_filename, file_content)
+                
+                update_data["file_name"] = original_full_name
+                update_data["file_path"] = unique_filename
+            except Exception as e:
+                print(f"Ошибка загрузки нового файла: {e}")
+                return jsonify({"error": "Ошибка сохранения файла"}), 500
+
+    # 4. Обновляем БД
+    result = supabase.table("reports").update(update_data).eq("id", report_id).execute()
+    
+    return jsonify({"message": "Отчёт обновлён", "report": result.data[0]}), 200
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

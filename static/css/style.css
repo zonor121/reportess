@@ -420,10 +420,8 @@ a:hover { text-decoration: underline; }
     padding: 0.3rem 0.7rem;
 }
 
-@media (max-width: 600px) {
-    .recent-item { flex-direction: column; align-items: flex-start; }
-    .recent-actions { width: 100%; justify-content: space-between; margin-top: 0.5rem; }
-}
+.btn-warning { background: #e09f3e; color: #fff; }
+.btn-warning:hover { background: #c98a28; color: #fff; }
 
 /* Сетка статистики */
 .stats-grid {
@@ -516,4 +514,9 @@ a:hover { text-decoration: underline; }
   .navbar-menu { flex-wrap: wrap; justify-content: center; }
   .reports-header { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
   .reports-list.layout-4, .reports-list.layout-6 { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 600px) {
+    .recent-item { flex-direction: column; align-items: flex-start; }
+    .recent-actions { width: 100%; justify-content: space-between; margin-top: 0.5rem; }
 }

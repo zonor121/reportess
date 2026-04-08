@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const loading = document.getElementById("reports-loading");
     const reportModal = document.getElementById("report-modal");
     const reviewModal = document.getElementById("review-modal");
+    const editModal = document.getElementById("edit-modal");
 
     if (!reportsList) return;
 
@@ -11,17 +12,6 @@ document.addEventListener("DOMContentLoaded", function () {
     applyLayout(savedLayout);
 
     loadReports();
-    
-    // === ПРОВЕРКА: есть ли в URL параметр open_report ===
-    const urlParams = new URLSearchParams(window.location.search);
-    const reportIdToOpen = urlParams.get('open_report');
-    
-    if (reportIdToOpen) {
-        setTimeout(function() {
-            viewReport(reportIdToOpen);
-            window.history.replaceState({}, document.title, '/reports');
-        }, 1000);
-    }
 
     function applyLayout(layoutClass) {
         reportsList.classList.remove('layout-3', 'layout-4', 'layout-6');
@@ -33,8 +23,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 btn.classList.add('active');
             }
         });
-
-        loadReports();
     }
 
     window.setLayout = function(layoutClass) {
@@ -74,7 +62,6 @@ document.addEventListener("DOMContentLoaded", function () {
         card.className = "report-card";
 
         const studentName = report.users?.full_name || "";
-        
         let metaHTML = `
             <span>📅 ${formatDate(report.uploaded_at)}</span>
             <span>🏢 ${report.practice_type}</span>
@@ -88,33 +75,30 @@ document.addEventListener("DOMContentLoaded", function () {
         if (window.IS_TEACHER) {
             actionsHTML += `<button class="btn btn-success btn-sm" onclick="openReviewModal('${report.id}')">Оценить</button>`;
             actionsHTML += `<button class="btn btn-secondary btn-sm" onclick="downloadReport('${report.id}')">Скачать</button>`;
+        } else {
+            // Студент может редактировать только "На проверке"
+            if (report.status === 'pending') {
+                actionsHTML += `<button class="btn btn-warning btn-sm" onclick="openEditModal('${report.id}')">✏️ Изменить</button>`;
+            }
         }
 
         let feedbackHTML = '';
         if (report.feedback && reportsList.classList.contains('layout-3')) {
-            feedbackHTML = `
-                <div class="card-feedback">
-                    <strong>Комментарий:</strong> ${escapeHtml(report.feedback)}
-                </div>
-            `;
+            feedbackHTML = `<div class="card-feedback"><strong>Комментарий:</strong> ${escapeHtml(report.feedback)}</div>`;
         }
 
         card.innerHTML = `
             <div class="report-info">
                 <h3>${escapeHtml(report.title)}</h3>
-                <div class="report-meta">
-                    ${metaHTML}
-                    <span class="status-badge ${statusClass(report.status)}">${formatStatus(report.status)}</span>
-                </div>
+                <div class="report-meta">${metaHTML}<span class="status-badge ${statusClass(report.status)}">${formatStatus(report.status)}</span></div>
                 ${feedbackHTML}
             </div>
-            <div class="report-actions">
-                ${actionsHTML}
-            </div>
+            <div class="report-actions">${actionsHTML}</div>
         `;
         return card;
     }
 
+    // === ПРОСМОТР ===
     window.viewReport = function (reportId) {
         fetch(`/api/report/${reportId}/file`)
             .then(res => res.json())
@@ -122,7 +106,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 return fetch("/api/reports").then(res => res.json()).then(all => {
                     const report = all.find(r => r.id === reportId);
                     if (!report) throw new Error("Отчёт не найден");
-
                     const studentName = report.users?.full_name || "";
                     let bodyHTML = `
                         <div class="modal-body-detail">
@@ -130,13 +113,12 @@ document.addEventListener("DOMContentLoaded", function () {
                             <p><strong>Период:</strong> ${report.practice_start} — ${report.practice_end}</p>
                             ${studentName ? `<p><strong>Студент:</strong> ${studentName}</p>` : ''}
                             ${report.description ? `<p><strong>Описание:</strong><br>${escapeHtml(report.description)}</p>` : ''}
-                            <p style="margin-top:1rem;"><a href="${fileData.file_url}" download="${fileData.file_name}" target="_blank" class="btn btn-primary btn-sm">📥 Скачать файл (${fileData.file_name}) </a></p>
+                            <p style="margin-top:1rem;"><a href="${fileData.file_url}" download="${fileData.file_name}" target="_blank" class="btn btn-primary btn-sm">📥 Скачать файл</a></p>
                             <p><strong>Статус:</strong> <span class="status-badge ${statusClass(report.status)}">${formatStatus(report.status)}</span></p>
                             ${report.grade ? `<p><strong>Оценка:</strong> ${report.grade}</p>` : ''}
                             ${report.feedback ? `<div class="feedback-box"><strong>Комментарий:</strong><br>${escapeHtml(report.feedback)}</div>` : ''}
                         </div>
                     `;
-
                     document.getElementById("modal-title").textContent = report.title;
                     document.getElementById("modal-body").innerHTML = bodyHTML;
                     reportModal.style.display = "flex";
@@ -145,24 +127,28 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(err => showNotification("Ошибка: " + err, "danger"));
     };
 
+    // === СКАЧИВАНИЕ ===
     window.downloadReport = function (reportId) {
         fetch(`/api/report/${reportId}/file`)
             .then(res => res.json())
             .then(data => {
-                // Создаём невидимую ссылку и кликаем по ней
                 const link = document.createElement('a');
                 link.href = data.file_url;
-                link.download = data.file_name;  // Оригинальное имя!
+                link.download = data.file_name;
                 link.target = '_blank';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
             })
             .catch(err => showNotification("Ошибка скачивания", "danger"));
-        };
+    };
 
+    // === ОЦЕНКА (ПРЕПОДАВАТЕЛЬ) ===
     window.openReviewModal = function (reportId) {
         document.getElementById("review-report-id").value = reportId;
+        document.getElementById("review-status").value = "pending";
+        document.getElementById("review-grade").value = "";
+        document.getElementById("review-feedback").value = "";
         reviewModal.style.display = "flex";
     };
 
@@ -171,6 +157,7 @@ document.addEventListener("DOMContentLoaded", function () {
     window.onclick = (e) => {
         if (e.target === reportModal) reportModal.style.display = "none";
         if (e.target === reviewModal) reviewModal.style.display = "none";
+        if (editModal && e.target === editModal) editModal.style.display = "none";
     };
 
     document.getElementById("review-form").onsubmit = function (e) {
@@ -193,6 +180,71 @@ document.addEventListener("DOMContentLoaded", function () {
         })
         .catch(err => showNotification("Ошибка: " + err, "danger"));
     };
+
+    // === РЕДАКТИРОВАНИЕ (СТУДЕНТ) ===
+    window.openEditModal = function(reportId) {
+        console.log("Открываем редактирование для:", reportId);
+        if (!editModal) {
+            console.error("Модальное окно редактирования не найдено в HTML!");
+            return;
+        }
+
+        fetch("/api/reports")
+            .then(res => res.json())
+            .then(allReports => {
+                const report = allReports.find(r => r.id === reportId);
+                if (!report) return;
+
+                document.getElementById("edit-report-id").value = report.id;
+                document.getElementById("edit-title").value = report.title || "";
+                document.getElementById("edit-practice-type").value = report.practice_type || "учебная";
+                document.getElementById("edit-start").value = report.practice_start || "";
+                document.getElementById("edit-end").value = report.practice_end || "";
+                document.getElementById("edit-description").value = report.description || "";
+                document.getElementById("edit-file").value = ""; // Сброс поля файла
+
+                editModal.style.display = "flex";
+            })
+            .catch(err => console.error("Ошибка загрузки данных для редактирования:", err));
+    };
+
+    if (editModal) {
+        document.getElementById("edit-form").onsubmit = function(e) {
+            e.preventDefault();
+            const id = document.getElementById("edit-report-id").value;
+            const formData = new FormData();
+            
+            formData.append("title", document.getElementById("edit-title").value);
+            formData.append("practice_type", document.getElementById("edit-practice-type").value);
+            formData.append("practice_start", document.getElementById("edit-start").value);
+            formData.append("practice_end", document.getElementById("edit-end").value);
+            formData.append("description", document.getElementById("edit-description").value);
+            
+            const fileInput = document.getElementById("edit-file");
+            if (fileInput.files.length > 0) {
+                formData.append("file", fileInput.files[0]);
+            }
+
+            const submitBtn = document.getElementById("edit-submit-btn");
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Сохранение...";
+
+            fetch(`/api/reports/${id}`, { method: "PUT", body: formData })
+            .then(res => res.ok ? res.json() : Promise.reject("Ошибка сервера"))
+            .then(() => {
+                showNotification("Отчёт обновлён!", "success");
+                editModal.style.display = "none";
+                loadReports();
+            })
+            .catch(err => showNotification("Ошибка: " + err, "danger"))
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Сохранить изменения";
+            });
+        };
+
+        document.getElementById("edit-modal-close").onclick = () => editModal.style.display = "none";
+    }
 });
 
 function escapeHtml(text) {

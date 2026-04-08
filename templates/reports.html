@@ -8,9 +8,9 @@
         <div class="header-controls">
             <!-- Кнопки переключения вида -->
             <div class="layout-toggle">
-                <button class="layout-btn" onclick="setLayout('layout-3')" title="Список">☰</button>
+                <button class="layout-btn active" onclick="setLayout('layout-3')" title="Список">☰</button>
                 <button class="layout-btn" onclick="setLayout('layout-4')" title="Сетка (2 колонки)">⊞</button>
-                <button class="layout-btn" onclick="setLayout('layout-6')" title="Сетка (3 колонки)">⊞</button>
+                <button class="layout-btn" onclick="setLayout('layout-6')" title="Сетка (3 колонки)">⊞⊞</button>
             </div>
 
             {% if not is_teacher %}
@@ -20,7 +20,6 @@
     </div>
 
     <div id="reports-loading" class="loading">Загрузка...</div>
-    <!-- По умолчанию класс layout-3 -->
     <div id="reports-list" class="reports-list layout-3" style="display:none;"></div>
 
     <!-- Модалка просмотра -->
@@ -32,7 +31,7 @@
         </div>
     </div>
 
-    <!-- Модалка оценки -->
+    <!-- Модалка оценки (для преподавателя) -->
     <div id="review-modal" class="modal" style="display:none;">
         <div class="modal-content">
             <span class="modal-close" id="review-modal-close">&times;</span>
@@ -44,25 +43,75 @@
                     <select id="review-status">
                         <option value="pending">На проверке</option>
                         <option value="approved">Принят</option>
-                        <option value="rejected">Возвращён</option>
+                        <option value="rejected">Возвращён на доработку</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="review-grade">Оценка</label>
-                    <input type="text" id="review-grade" placeholder="5, отлично">
+                    <input type="text" id="review-grade" placeholder="5, отлично, зачтено">
                 </div>
                 <div class="form-group">
                     <label for="review-feedback">Комментарий</label>
-                    <textarea id="review-feedback" rows="4"></textarea>
+                    <textarea id="review-feedback" rows="4" placeholder="Обратная связь студенту"></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary btn-full">Сохранить</button>
+                <button type="submit" class="btn btn-primary btn-full">Сохранить оценку</button>
             </form>
         </div>
     </div>
+
+    <!-- Модалка редактирования (для студента) -->
+    <div id="edit-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close" id="edit-modal-close">&times;</span>
+            <h3>Редактирование отчёта</h3>
+            <form id="edit-form" enctype="multipart/form-data">
+                <input type="hidden" id="edit-report-id">
+                
+                <div class="form-group">
+                    <label>Название отчёта *</label>
+                    <input type="text" id="edit-title" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Тип практики *</label>
+                    <select id="edit-practice-type" required>
+                        <option value="учебная">Учебная</option>
+                        <option value="производственная">Производственная</option>
+                        <option value="преддипломная">Преддипломная</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Начало</label>
+                        <input type="date" id="edit-start">
+                    </div>
+                    <div class="form-group">
+                        <label>Окончание</label>
+                        <input type="date" id="edit-end">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea id="edit-description" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Загрузить новый файл (необязательно)</label>
+                    <input type="file" id="edit-file" accept=".pdf,.doc,.docx,.odt,.txt,.zip,.rar">
+                    <small style="color:var(--text-muted); font-size:0.85rem;">Если оставить пустым, старый файл сохранится.</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full" id="edit-submit-btn">Сохранить изменения</button>
+            </form>
+        </div>
+    </div>
+
 </div>
 
 <script>
-    // Передаем роль в JS
+    // Передаем роль в JavaScript
     var IS_TEACHER = {{ 'true' if is_teacher else 'false' }};
 </script>
 {% endblock %}
