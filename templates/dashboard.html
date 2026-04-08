@@ -16,25 +16,40 @@
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-icon" style="background: #eef2ff; color: #4361ee;">📄</div>
-            <div class="stat-info"><h3>Всего отчётов</h3><p class="stat-number">{{ stats.total }}</p></div>
+            <div class="stat-info">
+                <h3>Всего отчётов</h3>
+                <p class="stat-number">{{ stats.total }}</p>
+            </div>
         </div>
         <div class="stat-card">
             <div class="stat-icon" style="background: #fff3cd; color: #664d03;">⏳</div>
-            <div class="stat-info"><h3>На проверке</h3><p class="stat-number">{{ stats.pending }}</p></div>
+            <div class="stat-info">
+                <h3>На проверке</h3>
+                <p class="stat-number">{{ stats.pending }}</p>
+            </div>
         </div>
         <div class="stat-card">
             <div class="stat-icon" style="background: #d1e7dd; color: #0f5132;">✅</div>
-            <div class="stat-info"><h3>Принято</h3><p class="stat-number">{{ stats.approved }}</p></div>
+            <div class="stat-info">
+                <h3>Принято</h3>
+                <p class="stat-number">{{ stats.approved }}</p>
+            </div>
         </div>
         {% if is_teacher %}
         <div class="stat-card">
             <div class="stat-icon" style="background: #f8d7da; color: #842029;">🎓</div>
-            <div class="stat-info"><h3>Активных студентов</h3><p class="stat-number">{{ stats.students }}</p></div>
+            <div class="stat-info">
+                <h3>Активных студентов</h3>
+                <p class="stat-number">{{ stats.students }}</p>
+            </div>
         </div>
         {% else %}
         <div class="stat-card">
             <div class="stat-icon" style="background: #f8d7da; color: #842029;">❌</div>
-            <div class="stat-info"><h3>На доработке</h3><p class="stat-number">{{ stats.rejected }}</p></div>
+            <div class="stat-info">
+                <h3>На доработке</h3>
+                <p class="stat-number">{{ stats.rejected }}</p>
+            </div>
         </div>
         {% endif %}
     </div>
@@ -54,6 +69,20 @@
         {% if selected_student_id %}
         <a href="/dashboard" class="btn btn-sm btn-secondary">Сбросить фильтр</a>
         {% endif %}
+    </div>
+
+    <!-- Управление шаблонами отчётов -->
+    <div class="management-section">
+        <h3>📑 Шаблоны названий отчётов</h3>
+        <div class="template-manager">
+            <div class="template-input-group">
+                <input type="text" id="new-template-input" placeholder="Новое название (например: Отчёт по научной практике)" maxlength="255">
+                <button class="btn btn-primary btn-sm" onclick="addReportTemplate()">➕ Добавить</button>
+            </div>
+            <div id="templates-list" class="templates-list">
+                <div class="loading-small">Загрузка шаблонов...</div>
+            </div>
+        </div>
     </div>
     {% endif %}
 
@@ -86,7 +115,7 @@
     </div>
 </div>
 
-<!-- Модальное окно оценки (встроено в дашборд) -->
+<!-- Модальное окно оценки -->
 <div id="dash-review-modal" class="modal" style="display:none;">
     <div class="modal-content">
         <span class="modal-close" onclick="closeDashReviewModal()">&times;</span>
@@ -124,7 +153,7 @@
         window.location.href = '/dashboard' + (studentId ? '?student_id=' + studentId : '');
     }
 
-    // Уведомления (встроенная функция, чтобы не зависеть от main.js)
+    // Уведомления
     function showDashNotif(message, type = 'info') {
         const container = document.querySelector('.container') || document.body;
         const alert = document.createElement('div');
@@ -147,12 +176,10 @@
         document.getElementById('dash-review-modal').style.display = 'none';
     }
 
-    // Закрытие по клику вне окна
     window.onclick = function(e) {
         if (e.target === document.getElementById('dash-review-modal')) closeDashReviewModal();
     }
 
-    // Отправка формы
     document.getElementById('dash-review-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const id = document.getElementById('dash-review-report-id').value;
@@ -169,10 +196,84 @@
         .then(() => {
             showDashNotif('Оценка успешно сохранена!', 'success');
             closeDashReviewModal();
-            // Обновляем страницу через 1 сек, чтобы пересчитались карточки статистики
             setTimeout(() => location.reload(), 1000);
         })
         .catch(err => showDashNotif('Ошибка: ' + err, 'danger'));
     });
+
+    // === УПРАВЛЕНИЕ ШАБЛОНАМИ ОТЧЁТОВ (только для преподавателей) ===
+    {% if is_teacher %}
+    let reportTemplates = [];
+
+    function loadReportTemplates() {
+        fetch('/api/report-templates')
+            .then(res => res.json())
+            .then(templates => {
+                reportTemplates = templates;
+                renderTemplatesList();
+            })
+            .catch(err => {
+                document.getElementById('templates-list').innerHTML = 
+                    '<div class="error-text">Ошибка загрузки шаблонов</div>';
+            });
+    }
+
+    function renderTemplatesList() {
+        const container = document.getElementById('templates-list');
+        if (!reportTemplates.length) {
+            container.innerHTML = '<div class="empty-text">Нет добавленных шаблонов</div>';
+            return;
+        }
+        container.innerHTML = reportTemplates.map(t => `
+            <div class="template-item">
+                <span>${escapeHtml(t.title)}</span>
+                <button class="btn btn-danger btn-sm" onclick="deleteReportTemplate('${t.id}')">🗑 Удалить</button>
+            </div>
+        `).join('');
+    }
+
+    function addReportTemplate() {
+        const input = document.getElementById('new-template-input');
+        const title = input.value.trim();
+        if (!title) return showDashNotif('Введите название шаблона', 'warning');
+
+        fetch('/api/report-templates', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title})
+        })
+        .then(res => {
+            if (res.ok) return res.json();
+            return res.json().then(err => Promise.reject(err.error || 'Ошибка'));
+        })
+        .then(() => {
+            input.value = '';
+            loadReportTemplates();
+            showDashNotif('Шаблон добавлен', 'success');
+        })
+        .catch(err => showDashNotif('Ошибка: ' + err, 'danger'));
+    }
+
+    function deleteReportTemplate(id) {
+        if (!confirm('Удалить этот шаблон? Студенты больше не смогут его выбрать.')) return;
+        
+        fetch(`/api/report-templates/${id}`, {method: 'DELETE'})
+            .then(res => res.ok ? res.json() : Promise.reject('Ошибка'))
+            .then(() => {
+                loadReportTemplates();
+                showDashNotif('Шаблон удалён', 'info');
+            })
+            .catch(err => showDashNotif('Ошибка: ' + err, 'danger'));
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Загружаем шаблоны при открытии дашборда
+    document.addEventListener('DOMContentLoaded', loadReportTemplates);
+    {% endif %}
 </script>
 {% endblock %}

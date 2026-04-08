@@ -10,8 +10,12 @@
     
     <form id="upload-form" enctype="multipart/form-data">
         <div class="form-group">
-            <label for="title">Название отчёта *</label>
-            <input type="text" id="title" name="title" required placeholder="Отчёт по производственной практике">
+            <div class="form-group">
+                <label for="report-template">Название отчёта *</label>
+                <select id="report-template" name="title" required>
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
         </div>
 
         <div class="form-row">
@@ -62,4 +66,24 @@
 {% block scripts %}
 <script src="/static/js/main.js"></script>
 <script src="/static/js/upload.js"></script>
+<script>
+    // Загрузка шаблонов отчётов
+    document.addEventListener("DOMContentLoaded", function() {
+        fetch('/api/report-templates')
+            .then(res => res.json())
+            .then(templates => {
+                const select = document.getElementById('report-template');
+                select.innerHTML = '<option value="">Выберите название отчёта</option>';
+                templates.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.title;
+                    opt.textContent = t.title;
+                    select.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                document.getElementById('report-template').innerHTML = '<option value="">Ошибка загрузки</option>';
+            });
+    });
+</script>
 {% endblock %}

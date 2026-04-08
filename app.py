@@ -508,5 +508,38 @@ def export_excel():
         print(f"Ошибка генерации Excel: {e}")
         return jsonify({"error": "Не удалось создать файл"}), 500
 
+# ==========================================
+# API ШАБЛОНОВ ОТЧЁТОВ
+# ==========================================
+@app.route("/api/report-templates", methods=["GET"])
+@login_required
+def api_get_report_templates():
+    result = supabase.table("report_templates") \
+        .select("id, title") \
+        .eq("is_active", True) \
+        .order("title") \
+        .execute()
+    return jsonify(result.data if result.data else [])
+
+@app.route("/api/report-templates", methods=["POST"])
+@teacher_required
+def api_add_report_template():
+    data = request.get_json()
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"error": "Введите название"}), 400
+    try:
+        result = supabase.table("report_templates").insert({"title": title}).execute()
+        return jsonify(result.data[0] if result.data else {}), 201
+    except Exception:
+        return jsonify({"error": "Такой шаблон уже существует"}), 400
+
+@app.route("/api/report-templates/<template_id>", methods=["DELETE"])
+@teacher_required
+def api_delete_report_template(template_id):
+    supabase.table("report_templates").delete().eq("id", template_id).execute()
+    return jsonify({"message": "OK"})
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
