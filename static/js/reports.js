@@ -130,7 +130,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             <p><strong>Период:</strong> ${report.practice_start} — ${report.practice_end}</p>
                             ${studentName ? `<p><strong>Студент:</strong> ${studentName}</p>` : ''}
                             ${report.description ? `<p><strong>Описание:</strong><br>${escapeHtml(report.description)}</p>` : ''}
-                            <p style="margin-top:1rem;"><a href="${fileData.file_url}" download="${fileData.file_name}" target="_blank" class="btn btn-primary btn-sm">📥 Скачать файл</a></p>
+                            <p style="margin-top:1rem;"><a href="${fileData.file_url}" download="${fileData.file_name}" target="_blank" class="btn btn-primary btn-sm">📥 Скачать файл (${fileData.file_name}) </a></p>
                             <p><strong>Статус:</strong> <span class="status-badge ${statusClass(report.status)}">${formatStatus(report.status)}</span></p>
                             ${report.grade ? `<p><strong>Оценка:</strong> ${report.grade}</p>` : ''}
                             ${report.feedback ? `<div class="feedback-box"><strong>Комментарий:</strong><br>${escapeHtml(report.feedback)}</div>` : ''}
@@ -148,9 +148,18 @@ document.addEventListener("DOMContentLoaded", function () {
     window.downloadReport = function (reportId) {
         fetch(`/api/report/${reportId}/file`)
             .then(res => res.json())
-            .then(data => window.open(data.file_url, '_blank'))
+            .then(data => {
+                // Создаём невидимую ссылку и кликаем по ней
+                const link = document.createElement('a');
+                link.href = data.file_url;
+                link.download = data.file_name;  // Оригинальное имя!
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            })
             .catch(err => showNotification("Ошибка скачивания", "danger"));
-    };
+        };
 
     window.openReviewModal = function (reportId) {
         document.getElementById("review-report-id").value = reportId;

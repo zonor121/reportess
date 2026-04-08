@@ -434,12 +434,18 @@ def api_report_file(report_id):
     if session.get("role") != "teacher" and report.get("student_id") != session["user_id"]:
         return jsonify({"error": "Доступ запрещён"}), 403
 
-    public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{report['file_path']}"
+    # Получаем оригинальное имя файла из БД
+    original_filename = report.get("file_name", "download.docx")
+    file_path = report.get("file_path")
+    
+    # Генерируем публичную ссылку
+    public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{file_path}"
+    
     return jsonify({
         "file_url": public_url,
-        "file_name": report["file_name"],
+        "file_name": original_filename,  # Оригинальное имя для скачивания
+        "content_type": report.get("file_path", "").split(".")[-1]  # Расширение
     })
-
 # ... (остальной код app.py) ...
 
 @app.route("/api/export-excel")
