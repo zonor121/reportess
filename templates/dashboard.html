@@ -5,59 +5,36 @@
     <div class="dashboard-header">
         <div class="header-left">
             <h2>📊 {% if is_teacher %}Панель управления преподавателя{% else %}Моя статистика{% endif %}</h2>
-            <!-- Кнопка экспорта (видна только преподавателю) -->
             {% if is_teacher %}
-            <a href="/api/export-excel" class="btn btn-success btn-sm">
-                📥 Скачать отчёт в Excel
-            </a>
+            <a href="/api/export-excel" class="btn btn-success btn-sm">📥 Скачать Excel</a>
             {% endif %}
         </div>
         <span class="date-display" id="current-date"></span>
     </div>
 
-    <!-- ... остальной код дашборда ... -->
-
     <!-- Карточки статистики -->
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-icon" style="background: #eef2ff; color: #4361ee;">📄</div>
-            <div class="stat-info">
-                <h3>Всего отчётов</h3>
-                <p class="stat-number">{{ stats.total }}</p>
-            </div>
+            <div class="stat-info"><h3>Всего отчётов</h3><p class="stat-number">{{ stats.total }}</p></div>
         </div>
-
         <div class="stat-card">
             <div class="stat-icon" style="background: #fff3cd; color: #664d03;">⏳</div>
-            <div class="stat-info">
-                <h3>На проверке</h3>
-                <p class="stat-number">{{ stats.pending }}</p>
-            </div>
+            <div class="stat-info"><h3>На проверке</h3><p class="stat-number">{{ stats.pending }}</p></div>
         </div>
-
         <div class="stat-card">
             <div class="stat-icon" style="background: #d1e7dd; color: #0f5132;">✅</div>
-            <div class="stat-info">
-                <h3>Принято</h3>
-                <p class="stat-number">{{ stats.approved }}</p>
-            </div>
+            <div class="stat-info"><h3>Принято</h3><p class="stat-number">{{ stats.approved }}</p></div>
         </div>
-
         {% if is_teacher %}
         <div class="stat-card">
             <div class="stat-icon" style="background: #f8d7da; color: #842029;">🎓</div>
-            <div class="stat-info">
-                <h3>Активных студентов</h3>
-                <p class="stat-number">{{ stats.students }}</p>
-            </div>
+            <div class="stat-info"><h3>Активных студентов</h3><p class="stat-number">{{ stats.students }}</p></div>
         </div>
         {% else %}
         <div class="stat-card">
             <div class="stat-icon" style="background: #f8d7da; color: #842029;">❌</div>
-            <div class="stat-info">
-                <h3>На доработке</h3>
-                <p class="stat-number">{{ stats.rejected }}</p>
-            </div>
+            <div class="stat-info"><h3>На доработке</h3><p class="stat-number">{{ stats.rejected }}</p></div>
         </div>
         {% endif %}
     </div>
@@ -86,7 +63,7 @@
         {% if stats.recent %}
         <div class="recent-list">
             {% for report in stats.recent %}
-            <div class="recent-item">
+            <div class="recent-item" id="dash-report-{{ report.id }}">
                 <div class="recent-info">
                     <strong>{{ report.title }}</strong>
                     {% if is_teacher %}
@@ -94,7 +71,12 @@
                     {% endif %}
                     <span class="recent-date">📅 {{ report.uploaded_at[:10] }}</span>
                 </div>
-                <span class="status-badge {{ statusClass(report.status) }}">{{ formatStatus(report.status) }}</span>
+                <div class="recent-actions">
+                    <span class="status-badge {{ statusClass(report.status) }}">{{ formatStatus(report.status) }}</span>
+                    {% if is_teacher %}
+                        <button class="btn btn-sm btn-success dash-grade-btn" onclick="openDashReviewModal('{{ report.id }}')">Оценить</button>
+                    {% endif %}
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -104,18 +86,93 @@
     </div>
 </div>
 
+<!-- Модальное окно оценки (встроено в дашборд) -->
+<div id="dash-review-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeDashReviewModal()">&times;</span>
+        <h3>Оценка отчёта</h3>
+        <form id="dash-review-form">
+            <input type="hidden" id="dash-review-report-id">
+            <div class="form-group">
+                <label for="dash-review-status">Статус</label>
+                <select id="dash-review-status">
+                    <option value="pending">На проверке</option>
+                    <option value="approved">Принят</option>
+                    <option value="rejected">Возвращён на доработку</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="dash-review-grade">Оценка</label>
+                <input type="text" id="dash-review-grade" placeholder="5, отлично, зачтено">
+            </div>
+            <div class="form-group">
+                <label for="dash-review-feedback">Комментарий</label>
+                <textarea id="dash-review-feedback" rows="3"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Сохранить</button>
+        </form>
+    </div>
+</div>
+
 <script>
-    // Отображаем текущую дату
+    // Дата
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     document.getElementById('current-date').textContent = new Date().toLocaleDateString('ru-RU', options);
 
-    // Фильтрация по студенту
+    // Фильтр студентов
     function filterByStudent(studentId) {
-        if (studentId) {
-            window.location.href = '/dashboard?student_id=' + studentId;
-        } else {
-            window.location.href = '/dashboard';
-        }
+        window.location.href = '/dashboard' + (studentId ? '?student_id=' + studentId : '');
     }
+
+    // Уведомления (встроенная функция, чтобы не зависеть от main.js)
+    function showDashNotif(message, type = 'info') {
+        const container = document.querySelector('.container') || document.body;
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type}`;
+        alert.textContent = message;
+        container.prepend(alert);
+        setTimeout(() => { alert.remove(); }, 3000);
+    }
+
+    // Модальное окно оценки
+    function openDashReviewModal(reportId) {
+        document.getElementById('dash-review-report-id').value = reportId;
+        document.getElementById('dash-review-status').value = 'pending';
+        document.getElementById('dash-review-grade').value = '';
+        document.getElementById('dash-review-feedback').value = '';
+        document.getElementById('dash-review-modal').style.display = 'flex';
+    }
+
+    function closeDashReviewModal() {
+        document.getElementById('dash-review-modal').style.display = 'none';
+    }
+
+    // Закрытие по клику вне окна
+    window.onclick = function(e) {
+        if (e.target === document.getElementById('dash-review-modal')) closeDashReviewModal();
+    }
+
+    // Отправка формы
+    document.getElementById('dash-review-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const id = document.getElementById('dash-review-report-id').value;
+        const status = document.getElementById('dash-review-status').value;
+        const grade = document.getElementById('dash-review-grade').value;
+        const feedback = document.getElementById('dash-review-feedback').value;
+
+        fetch(`/api/reports/${id}/review`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status, grade, feedback})
+        })
+        .then(res => res.ok ? res.json() : Promise.reject('Ошибка сохранения'))
+        .then(() => {
+            showDashNotif('Оценка успешно сохранена!', 'success');
+            closeDashReviewModal();
+            // Обновляем страницу через 1 сек, чтобы пересчитались карточки статистики
+            setTimeout(() => location.reload(), 1000);
+        })
+        .catch(err => showDashNotif('Ошибка: ' + err, 'danger'));
+    });
 </script>
 {% endblock %}
