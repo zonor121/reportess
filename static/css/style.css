@@ -485,6 +485,12 @@ a:hover { text-decoration: underline; }
 
 .empty-text { color: var(--text-muted); text-align: center; padding: 1rem; }
 
+.filter-bar { margin-bottom: 1rem; }
+.filter-bar select {
+    padding: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px;
+    background: var(--input-bg); color: var(--text-primary); min-width: 200px;
+}
+
 /* Управление шаблонами отчётов */
 .template-manager, .type-manager { margin-top: 1rem; }
 .template-input-group, .type-input-group { 

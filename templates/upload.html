@@ -4,31 +4,29 @@
 <div class="upload-container">
     <div class="upload-header">
         <h2>Загрузка отчёта о практике</h2>
-        <!-- Кнопка очистки черновика (скрыта по умолчанию, покажется через JS) -->
         <button id="clear-draft-btn" class="btn btn-sm btn-danger" style="display:none;">🗑 Очистить черновик</button>
     </div>
     
     <form id="upload-form" enctype="multipart/form-data">
         <div class="form-group">
-            <div class="form-group">
-                <label for="report-template">Название отчёта *</label>
-                <select id="report-template" name="title" required>
-                    <option value="">Загрузка...</option>
-                </select>
-            </div>
+            <label for="report-template">Название отчёта *</label>
+            <select id="report-template" name="title" required>
+                <option value="">Загрузка...</option>
+            </select>
         </div>
 
-        <div class="form-row">
-            <div class="form-group">
-                <label for="practice_type">Тип практики *</label>
-                <select id="practice_type" name="practice_type" required>
-                    <option value="">Выберите тип</option>
-                    <option value="семестровая">Семестровая</option>
-                    <option value="учебная">Учебная</option>
-                    <option value="производственная">Производственная</option>
-                    <option value="преддипломная">Преддипломная</option>
-                </select>
-            </div>
+        <div class="form-group">
+            <label for="subject">Предмет *</label>
+            <select id="subject" name="subject_id" required>
+                <option value="">Загрузка...</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="practice_type">Тип практики *</label>
+            <select id="practice_type" name="practice_type" required>
+                <option value="">Загрузка...</option>
+            </select>
         </div>
 
         <div class="form-row">
@@ -61,29 +59,74 @@
         </button>
     </form>
 </div>
-{% endblock %}
 
-{% block scripts %}
-<script src="/static/js/main.js"></script>
-<script src="/static/js/upload.js"></script>
 <script>
-    // Загрузка шаблонов отчётов
-    document.addEventListener("DOMContentLoaded", function() {
-        fetch('/api/report-templates')
-            .then(res => res.json())
-            .then(templates => {
-                const select = document.getElementById('report-template');
-                select.innerHTML = '<option value="">Выберите название отчёта</option>';
-                templates.forEach(t => {
-                    const opt = document.createElement('option');
-                    opt.value = t.title;
-                    opt.textContent = t.title;
-                    select.appendChild(opt);
-                });
-            })
-            .catch(() => {
-                document.getElementById('report-template').innerHTML = '<option value="">Ошибка загрузки</option>';
+document.addEventListener("DOMContentLoaded", function() {
+    // Загрузка шаблонов
+    fetch('/api/report-templates')
+        .then(res => res.json())
+        .then(templates => {
+            const sel = document.getElementById('report-template');
+            if (!templates || templates.length === 0) {
+                sel.innerHTML = '<option value="">Нет доступных шаблонов</option>';
+                return;
+            }
+            sel.innerHTML = '<option value="">Выберите название отчёта</option>';
+            templates.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.title;
+                opt.textContent = t.title;
+                sel.appendChild(opt);
             });
-    });
+        })
+        .catch(err => {
+            console.error('Ошибка загрузки шаблонов:', err);
+            document.getElementById('report-template').innerHTML = '<option value="">Ошибка сети</option>';
+        });
+
+    // Загрузка предметов
+    fetch('/api/subjects')
+        .then(res => res.json())
+        .then(subjects => {
+            const sel = document.getElementById('subject');
+            if (!subjects || subjects.length === 0) {
+                sel.innerHTML = '<option value="">Нет доступных предметов</option>';
+                return;
+            }
+            sel.innerHTML = '<option value="">Выберите предмет</option>';
+            subjects.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.name;
+                sel.appendChild(opt);
+            });
+        })
+        .catch(err => {
+            console.error('Ошибка загрузки предметов:', err);
+            document.getElementById('subject').innerHTML = '<option value="">Ошибка сети</option>';
+        });
+
+    // Загрузка типов практик
+    fetch('/api/practice-types')
+        .then(res => res.json())
+        .then(types => {
+            const sel = document.getElementById('practice_type');
+            if (!types || types.length === 0) {
+                sel.innerHTML = '<option value="">Нет доступных типов</option>';
+                return;
+            }
+            sel.innerHTML = '<option value="">Выберите тип</option>';
+            types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.name;
+                opt.textContent = t.name;
+                sel.appendChild(opt);
+            });
+        })
+        .catch(err => {
+            console.error('Ошибка загрузки типов практик:', err);
+            document.getElementById('practice_type').innerHTML = '<option value="">Ошибка сети</option>';
+        });
+});
 </script>
 {% endblock %}

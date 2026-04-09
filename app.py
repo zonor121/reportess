@@ -2,11 +2,10 @@ import os
 import uuid
 import datetime
 import secrets
-import pandas as pd
 import io
-from flask import send_file
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+import pandas as pd
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from supabase import create_client, Client
@@ -116,7 +115,7 @@ def create_user(email: str, password_hash: str, full_name: str):
     }).execute()
     return result.data[0] if result.data else None
 
-def create_report(title, description, file_name, file_path, student_id, practice_type, practice_start, practice_end):
+def create_report(title, description, file_name, file_path, student_id, practice_type, practice_start, practice_end, subject_id=None):
     result = supabase.table("reports").insert({
         "title": title,
         "description": description,
@@ -126,19 +125,20 @@ def create_report(title, description, file_name, file_path, student_id, practice
         "practice_type": practice_type,
         "practice_start": practice_start,
         "practice_end": practice_end,
+        "subject_id": subject_id,
     }).execute()
     return result.data[0] if result.data else None
 
 def get_reports_for_student(student_id: str):
-    result = supabase.table("reports").select("*").eq("student_id", student_id).order("uploaded_at", desc=True).execute()
+    result = supabase.table("reports").select("*, users!inner(full_name, email), subjects(name)").eq("student_id", student_id).order("uploaded_at", desc=True).execute()
     return result.data if result.data else []
 
 def get_all_reports():
-    result = supabase.table("reports").select("*, users!inner(full_name, email)").order("uploaded_at", desc=True).execute()
+    result = supabase.table("reports").select("*, users!inner(full_name, email), subjects(name)").order("uploaded_at", desc=True).execute()
     return result.data if result.data else []
 
 def get_report_by_id(report_id: str):
-    result = supabase.table("reports").select("*, users!inner(full_name, email)").eq("id", report_id).execute()
+    result = supabase.table("reports").select("*, users!inner(full_name, email), subjects(name)").eq("id", report_id).execute()
     if result.data:
         return result.data[0]
     return None
@@ -278,6 +278,63 @@ def upload_page():
         return redirect(url_for("dashboard"))
     return render_template("upload.html")
 
+# Добавь эти функции если их нет (или обнови существующие)
+@app.route("/api/report-templates", methods=["GET"])
+@login_required
+def api_get_report_templates():
+    try:
+        result = supabase.table("report_templates").select("id, title").eq("is_active", True).order("title").execute()
+        return jsonify(result.data if result.data else [])
+    except Exception as e:
+        print(f"Ошибка загрузки шаблонов: {e}")
+        return jsonify([]), 200
+
+@app.route("/api/practice-types", methods=["GET"])
+@login_required
+def api_get_practice_types():
+    try:
+        result = supabase.table("practice_types").select("id, name").eq("is_active", True).order("name").execute()
+        return jsonify(result.data if result.data else [])
+    except Exception as e:
+        print(f"Ошибка загрузки типов практик: {e}")
+        return jsonify([]), 200
+
+# ==========================================
+# API ПРЕДМЕТОВ (с обработкой ошибок)
+# ==========================================
+@app.route("/api/subjects", methods=["GET"])
+@login_required
+def api_get_subjects():
+    try:
+        result = supabase.table("subjects").select("id, name").eq("is_active", True).order("name").execute()
+        return jsonify(result.data if result.data else [])
+    except Exception as e:
+        print(f"Ошибка загрузки предметов: {e}")
+        return jsonify([]), 200  # Возвращаем пустой список вместо ошибки
+
+@app.route("/api/subjects", methods=["POST"])
+@teacher_required
+def api_add_subject():
+    try:
+        data = request.get_json()
+        name = data.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "Введите название"}), 400
+        result = supabase.table("subjects").insert({"name": name}).execute()
+        return jsonify(result.data[0] if result.data else {}), 201
+    except Exception as e:
+        print(f"Ошибка добавления предмета: {e}")
+        return jsonify({"error": "Такой предмет уже существует или ошибка БД"}), 400
+
+@app.route("/api/subjects/<subject_id>", methods=["DELETE"])
+@teacher_required
+def api_delete_subject(subject_id):
+    try:
+        supabase.table("subjects").delete().eq("id", subject_id).execute()
+        return jsonify({"message": "OK"})
+    except Exception as e:
+        print(f"Ошибка удаления предмета: {e}")
+        return jsonify({"error": "Ошибка удаления"}), 500
 # ==========================================
 # API УВЕДОМЛЕНИЙ
 # ==========================================
@@ -321,8 +378,21 @@ def mark_all_read():
 @login_required
 def api_reports():
     is_teacher = session.get("role") == "teacher"
-    data = get_all_reports() if is_teacher else get_reports_for_student(session["user_id"])
-    return jsonify(data)
+    subject_id = request.args.get("subject_id")
+    student_id = request.args.get("student_id")
+
+    query = supabase.table("reports").select("*, users(full_name, email), subjects(name)")
+
+    if not is_teacher:
+        query = query.eq("student_id", session["user_id"])
+    elif student_id:
+        query = query.eq("student_id", student_id)
+
+    if subject_id:
+        query = query.eq("subject_id", subject_id)
+
+    result = query.order("uploaded_at", desc=True).execute()
+    return jsonify(result.data if result.data else [])
 
 @app.route("/api/upload", methods=["POST"])
 @login_required
@@ -357,6 +427,7 @@ def api_upload():
     practice_type = request.form.get("practice_type", "").strip()
     practice_start = request.form.get("practice_start", "").strip()
     practice_end = request.form.get("practice_end", "").strip()
+    subject_id = request.form.get("subject_id", "").strip() or None
 
     if not title or not practice_type or not practice_start or not practice_end:
         return jsonify({"error": "Заполните обязательные поля"}), 400
@@ -377,6 +448,7 @@ def api_upload():
         practice_type=practice_type,
         practice_start=practice_start,
         practice_end=practice_end,
+        subject_id=subject_id,
     )
 
     if report:
@@ -400,6 +472,67 @@ def api_upload():
         except: pass
         return jsonify({"error": "Ошибка сохранения в БД"}), 500
 
+@app.route("/api/reports/<report_id>", methods=["PUT"])
+@login_required
+def api_update_report(report_id):
+    report = get_report_by_id(report_id)
+    if not report:
+        return jsonify({"error": "Отчёт не найден"}), 404
+    
+    if report["student_id"] != session["user_id"]:
+        return jsonify({"error": "Доступ запрещён"}), 403
+    
+    if report["status"] != "pending":
+        return jsonify({"error": "Редактирование закрыто, отчёт уже проверен"}), 400
+
+    title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
+    practice_type = request.form.get("practice_type", "").strip()
+    practice_start = request.form.get("practice_start", "").strip()
+    practice_end = request.form.get("practice_end", "").strip()
+    subject_id = request.form.get("subject_id", "").strip() or None
+
+    if not title or not practice_type:
+        return jsonify({"error": "Заполните обязательные поля"}), 400
+
+    update_data = {
+        "title": title,
+        "description": description,
+        "practice_type": practice_type,
+        "practice_start": practice_start,
+        "practice_end": practice_end,
+        "subject_id": subject_id,
+    }
+
+    if "file" in request.files:
+        file = request.files["file"]
+        if file and file.filename != "":
+            original_full_name = file.filename
+            ext = original_full_name.rsplit(".", 1)[1].lower()
+            
+            old_file_path = report["file_path"]
+            try:
+                supabase.storage.from_(SUPABASE_BUCKET).remove([old_file_path])
+            except Exception as e:
+                print(f"Ошибка удаления старого файла: {e}")
+
+            safe_name = secure_filename(original_full_name.rsplit(".", 1)[0])
+            unique_filename = f"{uuid.uuid4().hex}.{ext}"
+            
+            try:
+                file_content = file.read()
+                supabase.storage.from_(SUPABASE_BUCKET).upload(unique_filename, file_content)
+                
+                update_data["file_name"] = original_full_name
+                update_data["file_path"] = unique_filename
+            except Exception as e:
+                print(f"Ошибка загрузки нового файла: {e}")
+                return jsonify({"error": "Ошибка сохранения файла"}), 500
+
+    result = supabase.table("reports").update(update_data).eq("id", report_id).execute()
+    
+    return jsonify({"message": "Отчёт обновлён", "report": result.data[0]}), 200
+
 @app.route("/api/reports/<report_id>/review", methods=["POST"])
 @teacher_required
 def api_review_report(report_id):
@@ -410,7 +543,6 @@ def api_review_report(report_id):
 
     result = update_report_status(report_id, status, grade, feedback)
     if result:
-        # === УВЕДОМЛЕНИЕ: Преподаватель оценил работу ===
         report = get_report_by_id(report_id)
         if report:
             create_notification(
@@ -434,69 +566,57 @@ def api_report_file(report_id):
     if session.get("role") != "teacher" and report.get("student_id") != session["user_id"]:
         return jsonify({"error": "Доступ запрещён"}), 403
 
-    # Получаем оригинальное имя файла из БД
     original_filename = report.get("file_name", "download.docx")
     file_path = report.get("file_path")
-    
-    # Генерируем публичную ссылку
     public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{file_path}"
     
     return jsonify({
         "file_url": public_url,
-        "file_name": original_filename,  # Оригинальное имя для скачивания
-        "content_type": report.get("file_path", "").split(".")[-1]  # Расширение
+        "file_name": original_filename,
     })
-# ... (остальной код app.py) ...
 
 @app.route("/api/export-excel")
-@teacher_required # Доступ только преподавателям
+@teacher_required
 def export_excel():
     try:
-        # 1. Получаем все отчёты с данными студентов
-        # Используем inner join, чтобы не тащить пустые связи
         result = supabase.table("reports") \
-            .select("*, users(full_name, email)") \
+            .select("*, users(full_name, email), subjects(name)") \
             .order("uploaded_at", desc=True) \
             .execute()
         
         data = result.data if result.data else []
 
-        # 2. Формируем плоский список данных для таблицы
         excel_data = []
         for report in data:
             student_info = report.get("users", {})
+            subject_info = report.get("subjects", {})
             excel_data.append({
                 "ФИО Студента": student_info.get("full_name", "Неизвестно"),
                 "Email": student_info.get("email", "-"),
+                "Предмет": subject_info.get("name", "—"),
                 "Название отчёта": report.get("title"),
                 "Тип практики": report.get("practice_type"),
                 "Период": f"{report.get('practice_start')} — {report.get('practice_end')}",
-                "Дата загрузки": str(report.get("uploaded_at", ""))[:10], # Берем только дату
+                "Дата загрузки": str(report.get("uploaded_at", ""))[:10],
                 "Статус": get_status_text(report.get("status")),
                 "Оценка": report.get("grade") or "—",
                 "Комментарий": report.get("feedback") or "—"
             })
 
-        # 3. Создаём DataFrame (таблицу Pandas)
         df = pd.DataFrame(excel_data)
 
-        # 4. Сохраняем в оперативную память (BytesIO), чтобы не создавать файлы на диске
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="Отчёты")
-            
-            # Немного красоты: авто-ширина колонок
             workbook = writer.book
             worksheet = writer.sheets["Отчёты"]
             for idx, col in enumerate(df.columns):
                 max_len = max(df[col].astype(str).map(len).max(), len(col))
-                # Формула для ширины (ограничиваем макс. шириной)
                 width = min(max_len + 2, 50)
                 worksheet.column_dimensions[chr(65 + idx)].width = width
 
         output.seek(0)
 
-        # 5. Отдаём файл клиенту
         return send_file(
             output,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -508,106 +628,9 @@ def export_excel():
         print(f"Ошибка генерации Excel: {e}")
         return jsonify({"error": "Не удалось создать файл"}), 500
 
-# ==========================================
-# API ШАБЛОНОВ ОТЧЁТОВ
-# ==========================================
-@app.route("/api/report-templates", methods=["GET"])
-@login_required
-def api_get_report_templates():
-    result = supabase.table("report_templates") \
-        .select("id, title") \
-        .eq("is_active", True) \
-        .order("title") \
-        .execute()
-    return jsonify(result.data if result.data else [])
-
-@app.route("/api/report-templates", methods=["POST"])
-@teacher_required
-def api_add_report_template():
-    data = request.get_json()
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error": "Введите название"}), 400
-    try:
-        result = supabase.table("report_templates").insert({"title": title}).execute()
-        return jsonify(result.data[0] if result.data else {}), 201
-    except Exception:
-        return jsonify({"error": "Такой шаблон уже существует"}), 400
-
-@app.route("/api/report-templates/<template_id>", methods=["DELETE"])
-@teacher_required
-def api_delete_report_template(template_id):
-    supabase.table("report_templates").delete().eq("id", template_id).execute()
-    return jsonify({"message": "OK"})
-
-@app.route("/api/reports/<report_id>", methods=["PUT"])
-@login_required
-def api_update_report(report_id):
-    # 1. Проверка прав
-    report = get_report_by_id(report_id)
-    if not report:
-        return jsonify({"error": "Отчёт не найден"}), 404
-    
-    # Только студент-владелец может редактировать
-    if report["student_id"] != session["user_id"]:
-        return jsonify({"error": "Доступ запрещён"}), 403
-    
-    # Только статус "pending" можно менять
-    if report["status"] != "pending":
-        return jsonify({"error": "Редактирование закрыто, отчёт уже проверен"}), 400
-
-    # 2. Получаем данные
-    title = request.form.get("title", "").strip()
-    description = request.form.get("description", "").strip()
-    practice_type = request.form.get("practice_type", "").strip()
-    practice_start = request.form.get("practice_start", "").strip()
-    practice_end = request.form.get("practice_end", "").strip()
-
-    if not title or not practice_type:
-        return jsonify({"error": "Заполните обязательные поля"}), 400
-
-    update_data = {
-        "title": title,
-        "description": description,
-        "practice_type": practice_type,
-        "practice_start": practice_start,
-        "practice_end": practice_end,
-    }
-
-    # 3. Обработка файла (если загрузили новый)
-    if "file" in request.files:
-        file = request.files["file"]
-        if file and file.filename != "":
-            original_full_name = file.filename
-            ext = original_full_name.rsplit(".", 1)[1].lower()
-            
-            # Удаляем старый файл из хранилища
-            old_file_path = report["file_path"]
-            try:
-                supabase.storage.from_(SUPABASE_BUCKET).remove([old_file_path])
-            except Exception as e:
-                print(f"Ошибка удаления старого файла: {e}")
-
-            # Загружаем новый
-            safe_name = secure_filename(original_full_name.rsplit(".", 1)[0])
-            unique_filename = f"{uuid.uuid4().hex}.{ext}"
-            
-            try:
-                file_content = file.read()
-                supabase.storage.from_(SUPABASE_BUCKET).upload(unique_filename, file_content)
-                
-                update_data["file_name"] = original_full_name
-                update_data["file_path"] = unique_filename
-            except Exception as e:
-                print(f"Ошибка загрузки нового файла: {e}")
-                return jsonify({"error": "Ошибка сохранения файла"}), 500
-
-    # 4. Обновляем БД
-    result = supabase.table("reports").update(update_data).eq("id", report_id).execute()
-    
-    return jsonify({"message": "Отчёт обновлён", "report": result.data[0]}), 200
-
-
+@app.route("/healthz")
+def healthz():
+    return "OK", 200
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
