@@ -430,80 +430,100 @@ def api_reports():
 @app.route("/api/upload", methods=["POST"])
 @login_required
 def api_upload():
+    # 1. Проверка роли
     if session.get("role") == "teacher":
         return jsonify({"error": "Преподаватели не загружают отчёты"}), 403
 
+    # 2. Проверка наличия файла
     if "file" not in request.files:
         return jsonify({"error": "Файл не выбран"}), 400
-
+    
     file = request.files["file"]
     if file.filename == "":
-        return jsonify({"error": "Файл не выбран"}), 400
+        return jsonify({"error": "Имя файла пустое"}), 400
 
-    original_full_name = file.filename
-    if "." not in original_full_name:
+    # 3. Обработка имени и расширения
+    original_filename = file.filename
+    if "." not in original_filename:
         return jsonify({"error": "Файл должен иметь расширение"}), 400
-
-    ext = original_full_name.rsplit(".", 1)[1].lower()
+    
+    ext = original_filename.rsplit(".", 1)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
-        return jsonify({"error": f"Недопустимый формат. Разрешены: {', '.join(ALLOWED_EXTENSIONS)}"}), 400
+        return jsonify({"error": f"Формат .{ext} запрещён"}), 400
 
-    name_without_ext = original_full_name.rsplit(".", 1)[0]
-    safe_name = secure_filename(name_without_ext)
-    if not safe_name:
-        safe_name = "report"
-    original_filename = f"{safe_name}.{ext}"
+    # Генерируем уникальное имя для хранилища
     unique_filename = f"{uuid.uuid4().hex}.{ext}"
 
+    # 4. Получение данных из формы
     title = request.form.get("title", "").strip()
     description = request.form.get("description", "").strip()
     practice_type = request.form.get("practice_type", "").strip()
     practice_start = request.form.get("practice_start", "").strip()
     practice_end = request.form.get("practice_end", "").strip()
-    subject_id = request.form.get("subject_id", "").strip() or None
+    
+    # ВАЖНО: Пустую строку от select превращаем в None, иначе БД может ругаться
+    raw_subject_id = request.form.get("subject_id", "").strip()
+    subject_id = raw_subject_id if raw_subject_id else None
 
+    # 5. Валидация обязательных полей
     if not title or not practice_type or not practice_start or not practice_end:
-        return jsonify({"error": "Заполните обязательные поля"}), 400
+        print(f"⚠️ Ошибка валидации: title={bool(title)}, type={bool(practice_type)}, start={bool(practice_start)}")
+        return jsonify({"error": "Заполните все обязательные поля (Название, Тип, Даты)"}), 400
 
     try:
+        # 6. Загрузка файла в Supabase Storage
         file_content = file.read()
         supabase.storage.from_(SUPABASE_BUCKET).upload(unique_filename, file_content)
-    except Exception as e:
-        print(f"❌ Ошибка Storage: {e}")
-        return jsonify({"error": "Ошибка загрузки файла"}), 500
+        print(f"✅ Файл загружен в хранилище: {unique_filename}")
 
-    report = create_report(
-        title=title,
-        description=description,
-        file_name=original_filename,
-        file_path=unique_filename,
-        student_id=session["user_id"],
-        practice_type=practice_type,
-        practice_start=practice_start,
-        practice_end=practice_end,
-        subject_id=subject_id,
-    )
+        # 7. Запись в БД
+        insert_data = {
+            "title": title,
+            "description": description,
+            "file_name": original_filename,
+            "file_path": unique_filename,
+            "student_id": session["user_id"],
+            "practice_type": practice_type,
+            "practice_start": practice_start,
+            "practice_end": practice_end,
+            "subject_id": subject_id,  # Может быть None, это нормально
+            "status": "pending"        # Статус по умолчанию
+        }
 
-    if report:
-        # === УВЕДОМЛЕНИЕ: Студент загрузил работу ===
-        teachers = supabase.table("users").select("id").eq("role", "teacher").execute()
-        if teachers.data:
-            for teacher in teachers.data:
-                create_notification(
-                    user_id=teacher["id"],
-                    title="Новая работа на проверку",
-                    message=f"Студент {session['full_name']} загрузил отчёт: {title}",
-                    type="upload",
-                    report_id=report["id"],
-                    sender_id=session["user_id"]
-                )
+        result = supabase.table("reports").insert(insert_data).execute()
+
+        if result.data and len(result.data) > 0:
+            report_id = result.data[0]["id"]
+            print(f"✅ Отчёт сохранён в БД: {report_id}")
+
+            # 8. Уведомление преподавателям
+            teachers = supabase.table("users").select("id").eq("role", "teacher").execute()
+            if teachers.data:
+                for teacher in teachers.data:
+                    supabase.table("notifications").insert({
+                        "user_id": teacher["id"],
+                        "sender_id": session["user_id"],
+                        "title": "Новая работа на проверку",
+                        "message": f"Студент загрузил: {title}",
+                        "type": "upload",
+                        "report_id": report_id
+                    }).execute()
+            
+            return jsonify({"message": "Отчёт успешно загружен", "report_id": report_id}), 201
         
-        return jsonify({"message": "Отчёт загружен", "report_id": report["id"]}), 201
-    else:
-        try:
-            supabase.storage.from_(SUPABASE_BUCKET).remove([unique_filename])
+        else:
+            print(f"❌ ОШИБКА БД: Supabase вернул пустой результат при вставке.")
+            # Пытаемся удалить файл, если запись не прошла
+            try: supabase.storage.from_(SUPABASE_BUCKET).remove([unique_filename])
+            except: pass
+            return jsonify({"error": "Ошибка сохранения в базу данных"}), 500
+
+    except Exception as e:
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {str(e)}")
+        # Удаляем файл при любой ошибке
+        try: supabase.storage.from_(SUPABASE_BUCKET).remove([unique_filename])
         except: pass
-        return jsonify({"error": "Ошибка сохранения в БД"}), 500
+        return jsonify({"error": f"Внутренняя ошибка сервера: {str(e)}"}), 500
 
 @app.route("/api/reports/<report_id>", methods=["PUT"])
 @login_required
