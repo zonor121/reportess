@@ -338,32 +338,65 @@ def api_delete_subject(subject_id):
 # ==========================================
 # API УВЕДОМЛЕНИЙ
 # ==========================================
+# ==========================================
+# API УВЕДОМЛЕНИЙ (ИСПРАВЛЕННЫЙ)
+# ==========================================
+
 @app.route("/api/notifications", methods=["GET"])
 @login_required
 def get_notifications():
-    result = supabase.table("notifications") \
-        .select("*") \
-        .eq("user_id", session["user_id"]) \
-        .order("created_at", desc=True) \
-        .limit(10) \
-        .execute()
-    return jsonify(result.data if result.data else [])
+    try:
+        result = supabase.table("notifications") \
+            .select("*") \
+            .eq("user_id", session["user_id"]) \
+            .order("created_at", desc=True) \
+            .limit(20) \
+            .execute()
+        return jsonify(result.data if result.data else [])
+    except Exception as e:
+        print(f"Ошибка получения уведомлений: {e}")
+        return jsonify([]), 200
+
+@app.route("/api/notifications/delete-all", methods=["POST"])
+@login_required
+def delete_all_notifications():
+    try:
+        supabase.table("notifications") \
+            .delete() \
+            .eq("user_id", session["user_id"]) \
+            .execute()
+        return jsonify({"message": "OK"})
+    except Exception as e:
+        print(f"Ошибка удаления уведомлений: {e}")
+        return jsonify({"error": "Ошибка удаления"}), 500
 
 @app.route("/api/notifications/unread-count", methods=["GET"])
 @login_required
 def get_unread_count():
-    result = supabase.table("notifications") \
-        .select("id", count="exact") \
-        .eq("user_id", session["user_id"]) \
-        .eq("is_read", False) \
-        .execute()
-    return jsonify({"count": result.count})
+    try:
+        result = supabase.table("notifications") \
+            .select("id", count="exact") \
+            .eq("user_id", session["user_id"]) \
+            .eq("is_read", False) \
+            .execute()
+        return jsonify({"count": result.count if result.count else 0})
+    except Exception as e:
+        print(f"Ошибка получения счётчика: {e}")
+        return jsonify({"count": 0}), 200
 
 @app.route("/api/notifications/<notification_id>/read", methods=["POST"])
 @login_required
 def mark_notification_read(notification_id):
-    supabase.table("notifications").update({"is_read": True}).eq("id", notification_id).execute()
-    return jsonify({"message": "OK"})
+    try:
+        supabase.table("notifications") \
+            .update({"is_read": True}) \
+            .eq("id", notification_id) \
+            .eq("user_id", session["user_id"]) \
+            .execute()
+        return jsonify({"message": "OK"})
+    except Exception as e:
+        print(f"Ошибка отметки прочитанного: {e}")
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route("/api/notifications/read-all", methods=["POST"])
 @login_required

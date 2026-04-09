@@ -3,30 +3,53 @@ document.addEventListener("DOMContentLoaded", function () {
     const notifDropdown = document.getElementById("notif-dropdown");
     const notifCount = document.getElementById("notif-count");
     const notifList = document.getElementById("notif-list");
+    const clearBtn = document.getElementById("clear-notif-btn");
 
-    if (!notifBtn) return; // Если пользователь не вошел, ничего не делаем
+    if (!notifBtn) return;
 
-    // 1. Загрузка непрочитанных уведомлений
+    // 1. Загрузка счетчика
     loadUnreadCount();
-    
-    // Обновляем счетчик каждые 30 секунд
     setInterval(loadUnreadCount, 30000);
 
-    // 2. Клик по колокольчику
+    // 2. Открытие/закрытие
     notifBtn.addEventListener("click", function (e) {
         e.stopPropagation();
-        notifDropdown.classList.toggle("show");
-        if (notifDropdown.classList.contains("show")) {
-            loadNotifications();
+        const isOpen = notifDropdown.classList.contains("show");
+        
+        if (isOpen) {
+            notifDropdown.classList.remove("show");
+        } else {
+            notifDropdown.classList.add("show");
+            loadNotifications(); // Загружаем список при открытии
         }
     });
 
-    // 3. Закрытие при клике вне меню
     document.addEventListener("click", function () {
         notifDropdown.classList.remove("show");
     });
 
-    // --- ФУНКЦИИ ---
+    // 3. Кнопка "Очистить все"
+    // Кнопка "Очистить все"
+    if (clearBtn) {
+        clearBtn.addEventListener("click", function() {
+            if (!confirm("Удалить все уведомления?")) return;
+            
+            fetch("/api/notifications/delete-all", { 
+                method: "POST"
+            })
+            .then(res => res.ok ? res.json() : Promise.reject("Ошибка"))
+            .then(() => {
+                loadNotifications();
+                loadUnreadCount();
+            })
+            .catch(err => {
+                console.error("Ошибка очистки:", err);
+                alert("Не удалось очистить уведомления");
+            });
+        });
+    }
+
+    // --- Функции ---
 
     function loadUnreadCount() {
         fetch("/api/notifications/unread-count")
@@ -42,14 +65,15 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function loadNotifications() {
-        notifList.innerHTML = '<div style="padding:10px; text-align:center;">Загрузка...</div>';
+        if (!notifList) return;
+        notifList.innerHTML = '<div style="padding:15px; text-align:center; color:#888;">Загрузка...</div>';
         
         fetch("/api/notifications")
             .then(res => res.json())
             .then(notifications => {
                 notifList.innerHTML = "";
                 if (!notifications.length) {
-                    notifList.innerHTML = '<div style="padding:15px; text-align:center; color:#888;">Нет уведомлений</div>';
+                    notifList.innerHTML = '<div style="padding:15px; text-align:center; color:var(--text-muted); font-size:0.9rem;">Нет уведомлений</div>';
                     return;
                 }
 
@@ -57,13 +81,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     const div = document.createElement("div");
                     div.className = `notif-item ${notif.is_read ? 'read' : ''}`;
                     
-                    // Иконка в зависимости от типа
                     let icon = "🔔";
                     if (notif.type === 'review') icon = "✅";
                     if (notif.type === 'upload') icon = "📄";
 
-                    let link = notif.report_id ? `/reports` : "#";
-                    
                     div.innerHTML = `
                         <div class="notif-icon">${icon}</div>
                         <div class="notif-content">
@@ -73,21 +94,16 @@ document.addEventListener("DOMContentLoaded", function () {
                         </div>
                     `;
 
-                    // Клик по уведомлению помечает его как прочитанное и перенаправляет
                     div.addEventListener("click", function() {
-                         if (!notif.is_read) {
-                            markAsRead(notif.id);
-                        }
-                            
-                        // Если есть report_id, перенаправляем на страницу отчётов с параметром
-                        if (notif.report_id) {
-                            // Открываем страницу отчётов и передаём ID для авто-открытия
-                            window.location.href = '/reports?open_report=' + notif.report_id;
-                         }
+                        if (!notif.is_read) markAsRead(notif.id);
+                        if (notif.report_id) window.location.href = '/reports?open_report=' + notif.report_id;
                     });
 
                     notifList.appendChild(div);
                 });
+            })
+            .catch(() => {
+                notifList.innerHTML = '<div style="padding:15px; text-align:center; color:#888;">Ошибка загрузки</div>';
             });
     }
 
@@ -96,12 +112,10 @@ document.addEventListener("DOMContentLoaded", function () {
         loadUnreadCount();
     }
 
-    // Вспомогательная: форматирование времени (например, "5 мин. назад")
     function formatTimeAgo(dateStr) {
         const date = new Date(dateStr);
         const now = new Date();
         const seconds = Math.floor((now - date) / 1000);
-
         if (seconds < 60) return "Только что";
         const minutes = Math.floor(seconds / 60);
         if (minutes < 60) return `${minutes} мин. назад`;

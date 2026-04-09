@@ -4,14 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Практики{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    
+    <!-- Стили -->
     <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Применяем тему до рендера, чтобы не было мигания -->
     <script>
         (function() {
             const theme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
-    <link rel="shortcut icon" href="static/logo.svg" type="image/svg+xml">
 </head>
 <body>
     <nav class="navbar">
@@ -25,7 +31,7 @@
                     <a href="/upload">Загрузить</a>
                 {% endif %}
                 
-                <!-- КОЛОКОЛЬЧИК УВЕДОМЛЕНИЙ -->
+                <!-- УВЕДОМЛЕНИЯ -->
                 <div class="notif-wrapper">
                     <button class="theme-toggle" id="notif-btn" title="Уведомления">
                         🔔
@@ -33,11 +39,18 @@
                     </button>
                     <div class="notif-dropdown" id="notif-dropdown">
                         <div class="notif-header">Уведомления</div>
-                        <div id="notif-list"></div>
+                        <div id="notif-list">
+                            <!-- JS заполнит список -->
+                        </div>
+                        <div class="notif-footer">
+                            <button id="clear-notif-btn">Очистить все</button>
+                        </div>
                     </div>
                 </div>
 
+                <!-- ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ -->
                 <button class="theme-toggle" id="theme-toggle" title="Переключить тему">🌙</button>
+                
                 <span class="user-info">👤 {{ session.full_name }}</span>
                 <a href="/logout" class="btn-logout">Выйти</a>
             {% else %}
@@ -49,34 +62,46 @@
     </nav>
 
     <main class="container">
+        <!-- Всплывающие сообщения (Flash) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
         {% endwith %}
+        
+        <!-- Основной контент страниц -->
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="footer"><p>&copy; 2026 Система учёта практик</p></footer>
-    {% block scripts %}{% endblock %}
-    
-    <!-- Подключаем скрипт уведомлений -->
+    <footer class="footer">
+        <p>&copy; 2026 Система учёта практик</p>
+    </footer>
+
+    <!-- Скрипты -->
     <script src="/static/js/notifications.js"></script>
     
     <script>
+        // Логика переключения темы
         const themeToggle = document.getElementById('theme-toggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', function() {
                 const currentTheme = document.documentElement.getAttribute('data-theme');
                 const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                
                 document.documentElement.setAttribute('data-theme', newTheme);
                 localStorage.setItem('theme', newTheme);
                 themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
             });
             
+            // Устанавливаем правильную иконку при загрузке
             const savedTheme = localStorage.getItem('theme') || 'light';
             themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
         }
     </script>
+
+    <!-- Блок для индивидуальных скриптов страниц -->
+    {% block scripts %}{% endblock %}
 </body>
 </html>
