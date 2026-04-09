@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>⚙️ Настройки системы</h2>
+    </div>
+
+    <div class="management-section">
+        <h3>📚 Управление предметами</h3>
+        <div class="template-input-group">
+            <input type="text" id="new-subject-input" placeholder="Новый предмет (например: Искусственный интеллект)" maxlength="100">
+            <button class="btn btn-primary btn-sm" onclick="addSubject()">➕ Добавить</button>
+        </div>
+        <div id="subjects-list" class="templates-list"></div>
+    </div>
+
+    <div class="management-section">
+        <h3>👥 Управление группами</h3>
+        <div class="template-input-group">
+            <input type="text" id="new-group-input" placeholder="Название группы (например: ИС-21)" maxlength="50">
+            <button class="btn btn-primary btn-sm" onclick="addGroup()">➕ Создать</button>
+        </div>
+        <div id="groups-list" class="templates-list"></div>
+    </div>
+
+    <div class="management-section">
+        <h3>🎓 Распределение студентов по группам</h3>
+        <div id="students-list" class="students-table-container"></div>
+    </div>
+</div>
+
+<script>
+    function showNotif(msg, type='info') {
+        const d = document.createElement('div'); d.className=`alert alert-${type}`; d.textContent=msg;
+        document.querySelector('.container').prepend(d); setTimeout(()=>d.remove(),3000);
+    }
+    function escapeHtml(t){if(!t)return"";const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+
+    // === ПРЕДМЕТЫ ===
+    function loadSubjects() {
+        fetch('/api/subjects').then(r=>r.json()).then(list=>{
+            document.getElementById('subjects-list').innerHTML = list.map(s=>`
+                <div class="template-item"><span>${escapeHtml(s.name)}</span>
+                <button class="btn btn-danger btn-sm" onclick="del('/api/subjects/${s.id}', loadSubjects)">🗑</button></div>
+            `).join('') || '<div class="empty-text">Нет предметов</div>';
+        });
+    }
+    function addSubject() {
+        const i=document.getElementById('new-subject-input'); if(!i.value.trim()) return;
+        fetch('/api/subjects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:i.value.trim()})})
+        .then(r=>r.ok?r.json():Promise.reject('Ошибка')).then(()=>{i.value='';loadSubjects();showNotif('Добавлено','success');})
+        .catch(()=>showNotif('Ошибка','danger'));
+    }
+
+    // === ГРУППЫ ===
+    function loadGroups() {
+        fetch('/api/groups').then(r=>r.json()).then(list=>{
+            document.getElementById('groups-list').innerHTML = list.map(g=>`
+                <div class="template-item"><span>${escapeHtml(g.name)}</span>
+                <button class="btn btn-danger btn-sm" onclick="del('/api/groups/${g.id}', loadGroups)">🗑</button></div>
+            `).join('') || '<div class="empty-text">Нет групп</div>';
+        });
+    }
+    function addGroup() {
+        const i=document.getElementById('new-group-input'); if(!i.value.trim()) return;
+        fetch('/api/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:i.value.trim()})})
+        .then(r=>r.ok?r.json():Promise.reject('Ошибка')).then(()=>{i.value='';loadGroups();loadStudents();showNotif('Группа создана','success');})
+        .catch(()=>showNotif('Ошибка','danger'));
+    }
+
+    // === СТУДЕНТЫ ===
+    let allGroups = [];
+    function loadStudents() {
+        Promise.all([fetch('/api/students').then(r=>r.json()), fetch('/api/groups').then(r=>r.json())])
+        .then(([students, groups])=>{
+            allGroups=groups;
+            const c=document.getElementById('students-list');
+            if(!students.length){c.innerHTML='<div class="empty-text">Нет студентов</div>';return;}
+            let h='<table class="students-table"><thead><tr><th>Студент</th><th>Email</th><th>Текущая группа</th><th>Назначить группу</th></tr></thead><tbody>';
+            students.forEach(s=>{
+                const cur = s.groups ? s.groups.name : '—';
+                let opts='<option value="">Без группы</option>';
+                allGroups.forEach(g=>{
+                    opts+=`<option value="${g.id}" ${s.group_id===g.id?'selected':''}>${escapeHtml(g.name)}</option>`;
+                });
+                h+=`<tr><td>${escapeHtml(s.full_name)}</td><td>${escapeHtml(s.email)}</td><td><span class="group-badge">${escapeHtml(cur)}</span></td>
+                <td><select class="group-select" onchange="assign('${s.id}',this.value)">${opts}</select></td></tr>`;
+            });
+            c.innerHTML=h+'</tbody></table>';
+        });
+    }
+    function assign(uid, gid) {
+        fetch(`/api/users/${uid}/group`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({group_id: gid||null})})
+        .then(r=>r.ok?r.json():Promise.reject('Ошибка')).then(()=>{loadStudents();showNotif('Обновлено','success');})
+        .catch(()=>showNotif('Ошибка','danger'));
+    }
+
+    function del(url, cb){if(!confirm('Удалить?'))return; fetch(url,{method:'DELETE'}).then(r=>r.ok?r.json():Promise.reject('Ошибка')).then(cb).catch(()=>showNotif('Ошибка','danger'));}
+
+    document.addEventListener('DOMContentLoaded', ()=>{ loadSubjects(); loadGroups(); loadStudents(); });
+</script>
+{% endblock %}

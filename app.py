@@ -665,5 +665,59 @@ def export_excel():
 def healthz():
     return "OK", 200
 
+# ==========================================
+# API ГРУПП И УПРАВЛЕНИЯ СТУДЕНТАМИ
+# ==========================================
+
+@app.route("/api/groups", methods=["GET"])
+@login_required
+def api_get_groups():
+    result = supabase.table("groups").select("*").order("name").execute()
+    return jsonify(result.data if result.data else [])
+
+@app.route("/api/groups", methods=["POST"])
+@teacher_required
+def api_add_group():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    if not name: return jsonify({"error": "Введите название"}), 400
+    try:
+        result = supabase.table("groups").insert({"name": name}).execute()
+        return jsonify(result.data[0] if result.data else {}), 201
+    except Exception:
+        return jsonify({"error": "Такая группа уже существует"}), 400
+
+@app.route("/api/groups/<group_id>", methods=["DELETE"])
+@teacher_required
+def api_delete_group(group_id):
+    supabase.table("groups").delete().eq("id", group_id).execute()
+    return jsonify({"message": "OK"})
+
+@app.route("/api/users/<user_id>/group", methods=["PUT"])
+@teacher_required
+def api_assign_student_group(user_id):
+    data = request.get_json()
+    group_id = data.get("group_id") # Может быть None (удалить из группы)
+    
+    # Обновляем пользователя
+    result = supabase.table("users").update({"group_id": group_id}).eq("id", user_id).execute()
+    return jsonify(result.data[0] if result.data else {}), 200
+
+@app.route("/api/students", methods=["GET"])
+@teacher_required
+def api_get_students():
+    # Получаем всех студентов + их группы
+    result = supabase.table("users") \
+        .select("id, full_name, email, group_id, groups(name)") \
+        .eq("role", "student") \
+        .order("full_name") \
+        .execute()
+    return jsonify(result.data if result.data else [])
+
+@app.route("/manage")
+@teacher_required
+def manage_page():
+    return render_template("manage.html")
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

@@ -26,6 +26,9 @@
             {% if session.user_id %}
                 <a href="/dashboard">Дашборд</a>
                 <a href="/reports">Отчёты</a>
+                {% if session.role == 'teacher' %}
+                    <a href="/manage">⚙️ Настройки</a>
+                {% endif %}
                 
                 {% if session.role != 'teacher' %}
                     <a href="/upload">Загрузить</a>
