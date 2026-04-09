@@ -559,3 +559,240 @@ a:hover { text-decoration: underline; }
     .recent-item { flex-direction: column; align-items: flex-start; }
     .recent-actions { width: 100%; justify-content: space-between; margin-top: 0.5rem; }
 }
+
+/* ==========================================
+   АДАПТИВНАЯ ВЁРСТКА (МОБИЛЬНЫЕ УСТРОЙСТВА)
+   ========================================== */
+
+/* Планшеты и меньше (768px) */
+@media (max-width: 768px) {
+    /* Навбар */
+    .navbar {
+        flex-wrap: wrap;
+        padding: 0.8rem 1rem;
+    }
+    
+    .navbar-brand {
+        flex: 1;
+    }
+    
+    .navbar-menu {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.8rem;
+        justify-content: flex-start;
+    }
+    
+    .navbar-menu a,
+    .navbar-menu button {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.6rem;
+    }
+    
+    .user-info {
+        display: none; /* Скрываем имя на маленьких экранах */
+    }
+    
+    /* Контейнер */
+    .container {
+        padding: 1rem;
+    }
+    
+    /* Карточки статистики */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr); /* 2 колонки */
+        gap: 0.8rem;
+    }
+    
+    .stat-card {
+        padding: 1rem;
+    }
+    
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+    }
+    
+    .stat-info h3 {
+        font-size: 0.8rem;
+    }
+    
+    .stat-number {
+        font-size: 1.5rem;
+    }
+    
+    /* Заголовки */
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.8rem;
+    }
+    
+    .dashboard-header h2 {
+        font-size: 1.3rem;
+    }
+    
+    /* Фильтры и секции управления */
+    .filter-section,
+    .management-section {
+        padding: 1rem;
+    }
+    
+    .template-input-group,
+    .type-input-group {
+        flex-direction: column;
+    }
+    
+    .template-input-group input,
+    .type-input-group input {
+        width: 100%;
+    }
+    
+    /* Список последних действий */
+    .recent-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.6rem;
+    }
+    
+    .recent-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    /* Отчёты */
+    .reports-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.8rem;
+    }
+    
+    .reports-header h2 {
+        font-size: 1.3rem;
+    }
+    
+    .layout-toggle {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .filter-bar {
+        width: 100%;
+    }
+    
+    .filter-bar select {
+        width: 100%;
+        max-width: none;
+    }
+    
+    /* Карточки отчётов - всегда в 1 колонку на мобильных */
+    .reports-list.layout-3,
+    .reports-list.layout-4,
+    .reports-list.layout-6 {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .report-card {
+        padding: 1rem;
+    }
+    
+    .report-meta {
+        flex-wrap: wrap;
+    }
+    
+    /* Модальные окна */
+    .modal-content {
+        width: 95%;
+        max-width: none;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    /* Формы */
+    .form-row {
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+    
+    .form-group {
+        width: 100%;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="date"],
+    select,
+    textarea {
+        font-size: 16px; /* Предотвращает зум на iOS */
+        padding: 0.7rem;
+    }
+    
+    /* Кнопки */
+    .btn {
+        padding: 0.7rem 1rem;
+        font-size: 0.95rem;
+        min-height: 44px; /* Удобно для пальцев */
+    }
+    
+    .btn-sm {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.85rem;
+        min-height: 38px;
+    }
+    
+    /* Уведомления */
+    .notif-dropdown {
+        right: -100px;
+        width: calc(100vw - 20px);
+        max-width: 350px;
+    }
+    
+    /* Футер */
+    .footer {
+        padding: 1.5rem 1rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Очень маленькие экраны (480px) */
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr; /* 1 колонка */
+    }
+    
+    .navbar-brand a {
+        font-size: 1.1rem;
+    }
+    
+    .navbar-menu {
+        justify-content: center;
+    }
+    
+    .dashboard-header h2 {
+        font-size: 1.1rem;
+    }
+    
+    .report-info h3 {
+        font-size: 1rem;
+    }
+    
+    /* Скрываем второстепенные элементы */
+    .date-display {
+        display: none;
+    }
+}
+
+/* Альбомная ориентация на маленьких экранах */
+@media (max-height: 600px) and (orientation: landscape) {
+    .modal-content {
+        max-height: 95vh;
+    }
+    
+    .stat-card {
+        padding: 0.8rem;
+    }
+}
