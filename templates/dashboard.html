@@ -54,7 +54,7 @@
             <div class="recent-item">
                 <div class="recent-info">
                     <strong>{{ report.title }}</strong>
-                    <span class="recent-author">👤 {{ report.users.full_name }}</span>
+                    <span class="recent-author">👤 {{ report.users.full_name if report.users else "Студент удалён" }}</span>
                     <span class="recent-date">📅 {{ report.uploaded_at[:10] }}</span>
                 </div>
                 <div class="recent-actions">
