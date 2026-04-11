@@ -31,7 +31,16 @@ SUPABASE_BUCKET = "reports"
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("❌ ОШИБКА: В файле .env не указаны SUPABASE_URL или SUPABASE_KEY")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Стало (с проверкой):
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("✅ Подключение к Supabase успешно")
+except Exception as e:
+    print(f"❌ ОШИБКА подключения к Supabase: {e}")
+    print(f"URL: {SUPABASE_URL}")
+    print(f"Key starts with: {SUPABASE_KEY[:10] if SUPABASE_KEY else 'None'}...")
+    raise
 
 ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "odt", "txt", "zip", "rar"}
 
