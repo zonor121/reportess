@@ -228,51 +228,79 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    is_teacher = session.get("role") == "teacher"
+    # 🔥 ЖЁСТКАЯ проверка роли из БД
+    try:
+        user_query = supabase.table("users").select("role").eq("id", session["user_id"]).execute()
+        if user_query.data and len(user_query.data) > 0:
+            db_role = user_query.data[0]["role"]
+            # Принудительно обновляем сессию
+            session["role"] = db_role
+            print(f"✅ Dashboard: DB role = {db_role}, session updated")
+        else:
+            print(f"⚠️ Dashboard: User not found in DB")
+            session["role"] = "student"
+    except Exception as e:
+        print(f"❌ Dashboard: Error fetching role: {e}")
+        session["role"] = "student"
+    
+    is_teacher = session["role"] == "teacher"
+    print(f"🔍 Dashboard: is_teacher = {is_teacher}")
+    
+    # Инициализация переменных
     stats = {}
     students_list = []
     selected_student_id = request.args.get("student_id")
 
     if is_teacher:
-        students = supabase.table("users").select("id, full_name, email").eq("role", "student").execute()
-        students_list = students.data if students.data else []
+        try:
+            students = supabase.table("users").select("id, full_name, email").eq("role", "student").execute()
+            students_list = students.data if students.data else []
 
-        query = supabase.table("reports").select("*, users(full_name, email)")
-        if selected_student_id:
-            query = query.eq("student_id", selected_student_id)
-        
-        all_reports = query.order("uploaded_at", desc=True).execute().data or []
-        
-        pending_count = len([r for r in all_reports if r.get("status") == "pending"])
-        approved_count = len([r for r in all_reports if r.get("status") == "approved"])
-        rejected_count = len([r for r in all_reports if r.get("status") == "rejected"])
-        unique_students = len(set(r["student_id"] for r in all_reports))
-        recent_reports = all_reports[:5]
+            query = supabase.table("reports").select("*, users(full_name, email)")
+            if selected_student_id:
+                query = query.eq("student_id", selected_student_id)
+            
+            all_reports = query.order("uploaded_at", desc=True).execute().data or []
+            
+            pending_count = len([r for r in all_reports if r.get("status") == "pending"])
+            approved_count = len([r for r in all_reports if r.get("status") == "approved"])
+            rejected_count = len([r for r in all_reports if r.get("status") == "rejected"])
+            unique_students = len(set(r["student_id"] for r in all_reports if r.get("student_id")))
+            recent_reports = all_reports[:5]
 
-        stats = {
-            "total": len(all_reports),
-            "pending": pending_count,
-            "approved": approved_count,
-            "rejected": rejected_count,
-            "students": unique_students,
-            "recent": recent_reports
-        }
+            stats = {
+                "total": len(all_reports),
+                "pending": pending_count,
+                "approved": approved_count,
+                "rejected": rejected_count,
+                "students": unique_students,
+                "recent": recent_reports
+            }
+        except Exception as e:
+            print(f"❌ Teacher dashboard error: {e}")
+            stats = {"total": 0, "pending": 0, "approved": 0, "rejected": 0, "students": 0, "recent": []}
     else:
-        my_reports = supabase.table("reports").select("*").eq("student_id", session["user_id"]).order("uploaded_at", desc=True).execute().data or []
-        stats = {
-            "total": len(my_reports),
-            "pending": len([r for r in my_reports if r.get("status") == "pending"]),
-            "approved": len([r for r in my_reports if r.get("status") == "approved"]),
-            "rejected": len([r for r in my_reports if r.get("status") == "rejected"]),
-            "recent": my_reports[:5]
-        }
+        # Студент
+        try:
+            my_reports = supabase.table("reports").select("*").eq("student_id", session["user_id"]).order("uploaded_at", desc=True).execute().data or []
+            
+            stats = {
+                "total": len(my_reports),
+                "pending": len([r for r in my_reports if r.get("status") == "pending"]),
+                "approved": len([r for r in my_reports if r.get("status") == "approved"]),
+                "rejected": len([r for r in my_reports if r.get("status") == "rejected"]),
+                "recent": my_reports[:5]
+            }
+        except Exception as e:
+            print(f"❌ Student dashboard error: {e}")
+            stats = {"total": 0, "pending": 0, "approved": 0, "rejected": 0, "recent": []}
 
     return render_template("dashboard.html", 
                          is_teacher=is_teacher, 
                          stats=stats, 
                          students_list=students_list,
                          selected_student_id=selected_student_id)
-
+                         
 @app.route("/reports")
 @login_required
 def reports():

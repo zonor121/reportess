@@ -59,7 +59,9 @@
                 </div>
                 <div class="recent-actions">
                     <span class="status-badge {{ statusClass(report.status) }}">{{ formatStatus(report.status) }}</span>
+                    {% if is_teacher %}
                     <button class="btn btn-sm btn-success dash-grade-btn" onclick="openDashReviewModal('{{ report.id }}')">Оценить</button>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
