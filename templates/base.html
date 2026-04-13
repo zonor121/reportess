@@ -29,6 +29,10 @@
                 {% if session.role == 'teacher' %}
                     <a href="/manage">⚙️ Настройки</a>
                 {% endif %}
+  
+                {% if session.role == 'admin' %}
+                    <a href="/admin" class="btn btn-danger btn-sm">🛡️ Админка</a>
+                {% endif %}
                 
                 {% if session.role != 'teacher' %}
                     <a href="/upload">Загрузить</a>

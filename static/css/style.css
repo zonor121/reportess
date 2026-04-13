@@ -549,11 +549,12 @@ a:hover { text-decoration: underline; }
 
 /* Таблица студентов в дашборде */
 .students-table-container { overflow-x: auto; margin-top: 1rem; }
-.students-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.students-table th { text-align: left; padding: 0.8rem; border-bottom: 2px solid var(--border-color); color: var(--text-muted); }
-.students-table td { padding: 0.8rem; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+.students-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.students-table th { text-align: left; padding: 10px; border-bottom: 2px solid var(--border-color); }
+.students-table td { padding: 10px; border-bottom: 1px solid var(--border-color); }
+.group-select { padding: 4px; border-radius: 4px; }
+.text-center { text-align: center; }
 .group-badge { background: var(--bg-tertiary); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; }
-.group-select { padding: 0.4rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-primary); width: 100%; max-width: 200px; }
 
 @media (max-width: 768px) {
     .students-table th:nth-child(2), .students-table td:nth-child(2) { display: none; } /* Скрыть Email на мобильных */

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Панель Администратора{% endblock %}
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>🛡️ Управление пользователями</h2>
+    </div>
+
+    <div class="management-section">
+        <h3>👥 Список всех пользователей</h3>
+        <div class="table-responsive">
+            <table class="students-table">
+                <thead>
+                    <tr>
+                        <th>Имя</th>
+                        <th>Email</th>
+                        <th>Роль</th>
+                        <th>Дата регистрации</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    <tr><td colspan="5" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const CURRENT_USER_ID = "{{ session.user_id }}"; // Чтобы не удалить себя
+
+    function loadUsers() {
+        fetch('/api/admin/users')
+            .then(res => res.json())
+            .then(users => {
+                const tbody = document.getElementById('users-table-body');
+                tbody.innerHTML = '';
+                
+                if (!users.length) {
+                    tbody.innerHTML = '<tr><td colspan="5">Нет пользователей</td></tr>';
+                    return;
+                }
+
+                users.forEach(u => {
+                    const isSelf = u.id === CURRENT_USER_ID;
+                    let roleBadgeClass = u.role === 'admin' ? 'status-rejected' : (u.role === 'teacher' ? 'status-pending' : 'status-approved');
+                    
+                    let roleSelect = `
+                        <select class="group-select" onchange="changeRole('${u.id}', this.value)" ${isSelf ? 'disabled' : ''}>
+                            <option value="student" ${u.role==='student'?'selected':''}>Студент</option>
+                            <option value="teacher" ${u.role==='teacher'?'selected':''}>Преподаватель</option>
+                            <option value="admin" ${u.role==='admin'?'selected':''}>Админ</option>
+                        </select>
+                    `;
+
+                    let deleteBtn = isSelf ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">🗑</button>`;
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${escapeHtml(u.full_name)} ${isSelf ? '<span class="badge-you">(Это вы)</span>' : ''}</td>
+                            <td>${escapeHtml(u.email)}</td>
+                            <td><span class="status-badge ${roleBadgeClass}">${u.role}</span></td>
+                            <td>${u.created_at ? u.created_at.slice(0,10) : '-'}</td>
+                            <td style="white-space:nowrap; gap:5px; display:flex;">
+                                ${roleSelect}
+                                ${deleteBtn}
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+    }
+
+    function changeRole(userId, newRole) {
+        if(!confirm(`Назначить роль "${newRole}"?`)) return;
+        
+        fetch(`/api/admin/users/${userId}/role`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({role: newRole})
+        })
+        .then(r => r.ok ? r.json() : Promise.reject('Ошибка'))
+        .then(() => {
+            alert('Роль обновлена!');
+            loadUsers();
+        })
+        .catch(e => alert('Ошибка: ' + e));
+    }
+
+    function deleteUser(userId) {
+        if(!confirm('Удалить пользователя и все его отчёты?')) return;
+        
+        fetch(`/api/admin/users/${userId}`, {method: 'DELETE'})
+        .then(r => r.ok ? r.json() : Promise.reject('Ошибка'))
+        .then(() => {
+            alert('Пользователь удалён');
+            loadUsers();
+        })
+        .catch(e => alert('Ошибка: ' + e));
+    }
+
+    function escapeHtml(text) {
+        if (!text) return "";
+        const d = document.createElement('div');
+        d.textContent = text;
+        return d.innerHTML;
+    }
+
+    document.addEventListener('DOMContentLoaded', loadUsers);
+</script>
+
+<style>
+    .badge-you { background: #4361ee; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; }
+    .table-responsive { overflow-x: auto; }
+</style>
+{% endblock %}

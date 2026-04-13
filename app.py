@@ -776,5 +776,64 @@ def api_get_students():
 def manage_page():
     return render_template("manage.html")
 
+# ==========================================
+# DECORATOR ДЛЯ АДМИНА
+# ==========================================
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session or session.get("role") != "admin":
+            flash("Доступ запрещён. Только администратор.", "danger")
+            return redirect(url_for("dashboard"))
+        return f(*args, **kwargs)
+    return decorated
+
+# ==========================================
+# МАРШРУТЫ АДМИНИСТРАТОРА
+# ==========================================
+@app.route("/admin")
+@admin_required
+def admin_panel():
+    return render_template("admin.html")
+
+@app.route("/api/admin/users", methods=["GET"])
+@admin_required
+def api_admin_get_users():
+    # ВАЖНО: Не возвращаем password_hash!
+    result = supabase.table("users") \
+        .select("id, full_name, email, role, created_at") \
+        .order("created_at", desc=True) \
+        .execute()
+    return jsonify(result.data if result.data else [])
+
+@app.route("/api/admin/users/<user_id>/role", methods=["PUT"])
+@admin_required
+def api_admin_change_role(user_id):
+    data = request.get_json()
+    new_role = data.get("role")
+    if new_role not in ["student", "teacher", "admin"]:
+        return jsonify({"error": "Неверная роль"}), 400
+    
+    # Запрещаем админу разжаловать самого себя
+    if user_id == session["user_id"]:
+        return jsonify({"error": "Нельзя изменить собственную роль"}), 400
+
+    result = supabase.table("users").update({"role": new_role}).eq("id", user_id).execute()
+    return jsonify({"message": "Роль обновлена"}), 200
+
+@app.route("/api/admin/users/<user_id>", methods=["DELETE"])
+@admin_required
+def api_admin_delete_user(user_id):
+    # Запрещаем удаление самого себя
+    if user_id == session["user_id"]:
+        return jsonify({"error": "Нельзя удалить себя"}), 400
+
+    # Сначала удаляем отчёты пользователя (если есть), чтобы не было мусора
+    supabase.table("reports").delete().eq("student_id", user_id).execute()
+    
+    # Удаляем пользователя
+    supabase.table("users").delete().eq("id", user_id).execute()
+    return jsonify({"message": "Пользователь удалён"}), 200
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
