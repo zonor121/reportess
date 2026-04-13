@@ -110,7 +110,11 @@ def create_notification(user_id, title, message, type="info", report_id=None, se
 # DB ФУНКЦИИ
 # ==========================================
 def get_user_by_email(email: str):
-    result = supabase.table("users").select("*").eq("email", email).execute()
+    result = supabase.table("users") \
+        .select("*") \
+        .eq("email", email) \
+        .is_("deleted_at", None) \
+        .execute() 
     if result.data:
         return result.data[0]
     return None
@@ -253,7 +257,11 @@ def dashboard():
 
     if is_teacher:
         try:
-            students = supabase.table("users").select("id, full_name, email").eq("role", "student").execute()
+            students = supabase.table("users") \
+            .select("id, full_name, email") \
+            .eq("role", "student") \
+            .is_("deleted_at", None) \
+            .execute()
             students_list = students.data if students.data else []
 
             query = supabase.table("reports").select("*, users(full_name, email)")
@@ -767,6 +775,7 @@ def api_get_students():
     result = supabase.table("users") \
         .select("id, full_name, email, group_id, groups(name)") \
         .eq("role", "student") \
+        .is_("deleted_at", None) \
         .order("full_name") \
         .execute()
     return jsonify(result.data if result.data else [])
@@ -799,11 +808,12 @@ def admin_panel():
 @app.route("/api/admin/users", methods=["GET"])
 @admin_required
 def api_admin_get_users():
-    # ВАЖНО: Не возвращаем password_hash!
-    result = supabase.table("users") \
-        .select("id, full_name, email, role, created_at") \
-        .order("created_at", desc=True) \
-        .execute()
+    result = (
+        supabase.table("users")
+        .select("id, full_name, email", "role", "created_at", "deleted_at")
+        .is_("deleted_at", None)
+        .execute()  
+    )
     return jsonify(result.data if result.data else [])
 
 @app.route("/api/admin/users/<user_id>/role", methods=["PUT"])
@@ -824,16 +834,25 @@ def api_admin_change_role(user_id):
 @app.route("/api/admin/users/<user_id>", methods=["DELETE"])
 @admin_required
 def api_admin_delete_user(user_id):
-    # Запрещаем удаление самого себя
     if user_id == session["user_id"]:
         return jsonify({"error": "Нельзя удалить себя"}), 400
 
-    # Сначала удаляем отчёты пользователя (если есть), чтобы не было мусора
-    supabase.table("reports").delete().eq("student_id", user_id).execute()
+    # Мягкое удаление — просто ставим timestamp
+    supabase.table("users") \
+        .update({"deleted_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}) \
+        .eq("id", user_id) \
+        .execute()
     
-    # Удаляем пользователя
-    supabase.table("users").delete().eq("id", user_id).execute()
     return jsonify({"message": "Пользователь удалён"}), 200
+
+@app.route("/api/admin/users/<user_id>/restore", methods=["POST"])
+@admin_required
+def api_admin_restore_user(user_id):
+    supabase.table("users") \
+        .update({"deleted_at": None}) \
+        .eq("id", user_id) \
+        .execute()
+    return jsonify({"message": "Пользователь восстановлен"}), 200
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
